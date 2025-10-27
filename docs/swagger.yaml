@@ -37,6 +37,48 @@ definitions:
       success:
         type: boolean
     type: object
+  models.CreateMatchRequest:
+    properties:
+      player1_id:
+        type: integer
+      player2_id:
+        type: integer
+      winner_id:
+        type: integer
+    required:
+    - player1_id
+    - player2_id
+    - winner_id
+    type: object
+  models.EloHistory:
+    properties:
+      created_at:
+        type: string
+      elo_after:
+        type: number
+      elo_before:
+        type: number
+      elo_change:
+        type: number
+      id:
+        type: integer
+      match:
+        $ref: '#/definitions/models.Match'
+      match_id:
+        type: integer
+      opponent:
+        $ref: '#/definitions/models.Player'
+      opponent_id:
+        type: integer
+      player:
+        allOf:
+        - $ref: '#/definitions/models.Player'
+        description: Relationships
+      player_id:
+        type: integer
+      updated_at:
+        type: string
+    type: object
   models.LoginRequest:
     properties:
       email:
@@ -46,6 +88,64 @@ definitions:
     required:
     - email
     - password
+    type: object
+  models.Match:
+    properties:
+      confirmed_at:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      player1:
+        allOf:
+        - $ref: '#/definitions/models.Player'
+        description: Relationships
+      player1_id:
+        type: integer
+      player2:
+        $ref: '#/definitions/models.Player'
+      player2_id:
+        type: integer
+      status:
+        description: pending, confirmed, rejected
+        type: string
+      updated_at:
+        type: string
+      winner:
+        $ref: '#/definitions/models.Player'
+      winner_id:
+        type: integer
+    type: object
+  models.PaginatedMatchResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.Match'
+        type: array
+      page:
+        type: integer
+      pageSize:
+        type: integer
+      total:
+        type: integer
+      totalPages:
+        type: integer
+    type: object
+  models.PaginatedPlayersResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.Player'
+        type: array
+      page:
+        type: integer
+      pageSize:
+        type: integer
+      total:
+        type: integer
+      totalPages:
+        type: integer
     type: object
   models.PasswordResetConfirmRequest:
     properties:
@@ -78,6 +178,46 @@ definitions:
       success:
         type: boolean
     type: object
+  models.Player:
+    properties:
+      best_win_streak:
+        type: integer
+      created_at:
+        type: string
+      current_win_streak:
+        type: integer
+      elo_history:
+        items:
+          $ref: '#/definitions/models.EloHistory'
+        type: array
+      elo_rating:
+        type: number
+      id:
+        type: integer
+      losses:
+        type: integer
+      player1_matches:
+        description: Relationships
+        items:
+          $ref: '#/definitions/models.Match'
+        type: array
+      player2_matches:
+        items:
+          $ref: '#/definitions/models.Match'
+        type: array
+      total_matches:
+        type: integer
+      updated_at:
+        type: string
+      username:
+        type: string
+      wins:
+        type: integer
+      won_matches:
+        items:
+          $ref: '#/definitions/models.Match'
+        type: array
+    type: object
   models.RefreshTokenRequest:
     properties:
       refresh_token:
@@ -99,6 +239,17 @@ definitions:
     - password
     - username
     type: object
+  models.Stats:
+    properties:
+      matches_last_7_days:
+        type: integer
+      matches_previous_7_days:
+        type: integer
+      total_matches:
+        type: integer
+      total_players:
+        type: integer
+    type: object
   models.TokenResponse:
     properties:
       access_token:
@@ -110,6 +261,16 @@ definitions:
         type: string
       token_type:
         type: string
+    type: object
+  models.UpdateMatchStatusRequest:
+    properties:
+      status:
+        enum:
+        - confirmed
+        - rejected
+        type: string
+    required:
+    - status
     type: object
   models.UpdateUserRequest:
     properties:
@@ -434,6 +595,39 @@ paths:
       summary: Send Password Reset Link
       tags:
       - auth
+  /elo-history/recent:
+    get:
+      description: Get recent ELO changes for all players ordered by date (newest
+        first)
+      parameters:
+      - description: 'Number of ELO changes to retrieve (default: 10, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.EloHistory'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get recent ELO changes
+      tags:
+      - elo-history
   /health:
     get:
       description: Check if the server is running and database is connected
@@ -447,6 +641,474 @@ paths:
       summary: Health Check
       tags:
       - health
+  /matches:
+    post:
+      consumes:
+      - application/json
+      description: Create a new match between two players with automatic ELO calculation
+        and stats update
+      parameters:
+      - description: Match data
+        in: body
+        name: match
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateMatchRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Match'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a new match
+      tags:
+      - matches
+  /matches/{id}:
+    patch:
+      consumes:
+      - application/json
+      description: Update the status of a pending match. Only player2 or admin can
+        confirm/reject.
+      parameters:
+      - description: Match ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: New status
+        in: body
+        name: status
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateMatchStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Match'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update match status (confirm/reject)
+      tags:
+      - matches
+  /matches/{id}/confirm:
+    put:
+      description: Confirm a pending match. Only player2 or admin can confirm.
+      parameters:
+      - description: Match ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Match'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Confirm a match
+      tags:
+      - matches
+  /matches/recent:
+    get:
+      description: Get the N most recent matches ordered by creation date (newest
+        first)
+      parameters:
+      - description: 'Number of matches to retrieve (default: 10, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Match'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get recent matches
+      tags:
+      - matches
+  /players:
+    get:
+      description: Get all players with pagination and sorting options
+      parameters:
+      - description: 'Sort field: ''created_at'', ''elo_rating'', ''username'' (default:
+          ''created_at'')'
+        in: query
+        name: orderBy
+        type: string
+      - description: 'Sort direction: ''ASC'' or ''DESC'' (default: ''DESC'')'
+        in: query
+        name: direction
+        type: string
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Number of players per page (default: 10, max: 100)'
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.PaginatedPlayersResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get all players
+      tags:
+      - players
+  /players/{id}:
+    get:
+      description: Get player information by player ID
+      parameters:
+      - description: Player ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Player'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get player by ID
+      tags:
+      - players
+  /players/{id}/elo-history:
+    get:
+      description: Get ELO rating history for a specific player
+      parameters:
+      - description: Player ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.EloHistory'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get player ELO history
+      tags:
+      - players
+  /players/{id}/matches:
+    get:
+      description: Get matches for a specific player, ordered from newest to oldest,
+        with optional filtering and pagination
+      parameters:
+      - description: Player ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Filter for wins only (set to '1')
+        in: query
+        name: wins
+        type: string
+      - description: Filter for losses only (set to '1')
+        in: query
+        name: losses
+        type: string
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Number of matches per page (default: 10, max: 100)'
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.PaginatedMatchResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get matches for a player
+      tags:
+      - players
+  /players/top:
+    get:
+      description: Get top N players ordered by ELO rating (highest first)
+      parameters:
+      - description: 'Number of players to retrieve (default: 10, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Player'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get top players by ELO rating
+      tags:
+      - players
+  /players/top-best-streak:
+    get:
+      description: Get top N players ordered by best win streak (highest first)
+      parameters:
+      - description: 'Number of players to retrieve (default: 10, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Player'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get top players by best win streak
+      tags:
+      - players
+  /players/top-current-streak:
+    get:
+      description: Get top N players ordered by current win streak (highest first)
+      parameters:
+      - description: 'Number of players to retrieve (default: 10, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Player'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get top players by current win streak
+      tags:
+      - players
   /protected/test:
     get:
       description: Test endpoint that requires JWT authentication
@@ -468,6 +1130,25 @@ paths:
       summary: Protected Test Endpoint
       tags:
       - protected
+  /stats:
+    get:
+      description: Get general statistics including total number of players and matches
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Stats'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get general statistics
+      tags:
+      - stats
   /users/{id}:
     put:
       consumes:

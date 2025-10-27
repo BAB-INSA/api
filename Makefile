@@ -19,6 +19,8 @@ help: ## Afficher l'aide
 	@echo "  lint             - Lancer golangci-lint"
 	@echo "  quality          - Lancer tous les outils de qualité"
 	@echo "  clean            - Nettoyer les fichiers générés"
+	@echo "  fixtures         - Générer des données de test"
+	@echo "  fixtures-clear   - Supprimer les données de test"
 
 build: ## Compiler l'application
 	@echo "Compilation de $(APP_NAME)..."
@@ -94,3 +96,18 @@ quality: ## Lancer tous les outils de qualité de code
 	@echo "=== Linter ==="
 	@if command -v golangci-lint >/dev/null 2>&1; then golangci-lint run || true; else $(shell go env GOPATH)/bin/golangci-lint run || true; fi
 	@echo "✅ Tous les outils de qualité ont été exécutés"
+
+# Fixtures
+.PHONY: fixtures fixtures-clear fixtures-regenerate
+
+fixtures: ## Générer des données de test (10 users, 50 matches, ELO history)
+	@echo "Génération des données de test..."
+	go run cmd/fixtures.go generate
+
+fixtures-clear: ## Supprimer toutes les données de test
+	@echo "Suppression des données de test..."
+	go run cmd/fixtures.go clear
+
+fixtures-regenerate: ## Supprimer et régénérer toutes les données de test
+	@echo "Régénération des données de test..."
+	go run cmd/fixtures.go regenerate

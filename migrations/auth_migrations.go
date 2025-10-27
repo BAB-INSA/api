@@ -12,6 +12,13 @@ func GetAuthMigrations() []MigrationDefinition {
 						id SERIAL PRIMARY KEY,
 						email VARCHAR(255) UNIQUE NOT NULL,
 						password VARCHAR(255) NOT NULL,
+						username VARCHAR(255) UNIQUE,
+						slug VARCHAR(255) UNIQUE,
+						enabled BOOLEAN DEFAULT true,
+						last_login TIMESTAMP NULL,
+						nb_connexion INTEGER DEFAULT 0,
+						confirmation_token VARCHAR(255) NULL,
+						password_requested_at TIMESTAMP NULL,
 						roles JSONB DEFAULT '["user"]'::jsonb,
 						created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 						updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -20,6 +27,8 @@ func GetAuthMigrations() []MigrationDefinition {
 					CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 					CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users(deleted_at);
 					CREATE INDEX IF NOT EXISTS idx_users_roles ON users USING GIN (roles);
+					CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username);
+					CREATE UNIQUE INDEX IF NOT EXISTS idx_users_slug ON users(slug);
 				`).Error
 			},
 			Down: func(db *gorm.DB) error {
@@ -47,38 +56,6 @@ func GetAuthMigrations() []MigrationDefinition {
 			},
 			Down: func(db *gorm.DB) error {
 				return db.Exec("DROP TABLE IF EXISTS refresh_tokens CASCADE").Error
-			},
-		},
-		{
-			Name: "2024_01_03_000000_add_user_extended_fields",
-			Up: func(db *gorm.DB) error {
-				return db.Exec(`
-					ALTER TABLE users 
-					ADD COLUMN IF NOT EXISTS username VARCHAR(255) UNIQUE,
-					ADD COLUMN IF NOT EXISTS slug VARCHAR(255) UNIQUE,
-					ADD COLUMN IF NOT EXISTS enabled BOOLEAN DEFAULT true,
-					ADD COLUMN IF NOT EXISTS last_login TIMESTAMP NULL,
-					ADD COLUMN IF NOT EXISTS nb_connexion INTEGER DEFAULT 0,
-					ADD COLUMN IF NOT EXISTS confirmation_token VARCHAR(255) NULL,
-					ADD COLUMN IF NOT EXISTS password_requested_at TIMESTAMP NULL;
-					
-					CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username);
-					CREATE UNIQUE INDEX IF NOT EXISTS idx_users_slug ON users(slug);
-				`).Error
-			},
-			Down: func(db *gorm.DB) error {
-				return db.Exec(`
-					DROP INDEX IF EXISTS idx_users_username;
-					DROP INDEX IF EXISTS idx_users_slug;
-					ALTER TABLE users 
-					DROP COLUMN IF EXISTS username,
-					DROP COLUMN IF EXISTS slug,
-					DROP COLUMN IF EXISTS enabled,
-					DROP COLUMN IF EXISTS last_login,
-					DROP COLUMN IF EXISTS nb_connexion,
-					DROP COLUMN IF EXISTS confirmation_token,
-					DROP COLUMN IF EXISTS password_requested_at;
-				`).Error
 			},
 		},
 	}

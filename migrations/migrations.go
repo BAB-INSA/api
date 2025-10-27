@@ -1,7 +1,12 @@
 package migrations
 
 func GetAllMigrations() []MigrationDefinition {
-	return []MigrationDefinition{
-		// Ajoutez vos propres migrations ici
-	}
+	migrations := []MigrationDefinition{}
+
+	// Add core migrations
+	migrations = append(migrations, GetCoreMigrations()...)
+
+	// Ajoutez vos propres migrations ici
+
+	return migrations
 }
