@@ -12,20 +12,23 @@ import (
 	"auth/models"
 	"auth/services"
 	"auth/utils"
+	coreServices "core/services"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type AuthHandler struct {
-	DB           *gorm.DB
-	EmailService services.EmailService
+	DB            *gorm.DB
+	EmailService  services.EmailService
+	PlayerService *coreServices.PlayerService
 }
 
-func NewAuthHandler(db *gorm.DB) *AuthHandler {
+func NewAuthHandler(db *gorm.DB, playerService *coreServices.PlayerService) *AuthHandler {
 	return &AuthHandler{
-		DB:           db,
-		EmailService: services.NewEmailService(), // Service email automatique (SMTP si configuré, sinon log)
+		DB:            db,
+		EmailService:  services.NewEmailService(), // Service email automatique (SMTP si configuré, sinon log)
+		PlayerService: playerService,
 	}
 }
 
@@ -79,6 +82,15 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	if err := h.DB.Create(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+		return
+	}
+
+	// Create corresponding player
+	_, err = h.PlayerService.CreatePlayer(user.ID, user.Username)
+	if err != nil {
+		// If player creation fails, we should rollback the user creation
+		h.DB.Delete(&user)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create player profile"})
 		return
 	}
 
@@ -186,7 +198,7 @@ func (h *AuthHandler) Profile(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"user": user})
+	c.JSON(http.StatusOK, user)
 }
 
 // @Summary Refresh Access Token
@@ -550,8 +562,5 @@ func (h *AuthHandler) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, models.UpdateUserResponse{
-		Success: true,
-		User:    user,
-	})
+	c.JSON(http.StatusOK, user)
 }

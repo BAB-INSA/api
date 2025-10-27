@@ -3,11 +3,16 @@ package main
 import (
 	"log"
 	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 
 	"auth"
 	"bab-insa-api/config"
 	_ "bab-insa-api/docs" // Swagger docs
+	"core"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	swaggerFiles "github.com/swaggo/files"
@@ -43,9 +48,51 @@ func main() {
 
 	r := gin.Default()
 
+	// Get CORS allowed origins from environment
+	corsOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
+	var allowedOrigins []string
+	if corsOrigins != "" {
+		allowedOrigins = strings.Split(corsOrigins, ",")
+		// Trim whitespace from each origin
+		for i, origin := range allowedOrigins {
+			allowedOrigins[i] = strings.TrimSpace(origin)
+		}
+	} else {
+		// Default origins for development
+		allowedOrigins = []string{"http://127.0.0.1:5173", "http://localhost:5173"}
+	}
+
+	// CORS middleware
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     allowedOrigins,
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization"},
+		AllowCredentials: true,
+	}))
+
 	// Setup auth module (includes all refresh token routes)
 	authModule := auth.NewModule(config.DB)
 	authModule.SetupRoutes(r)
+
+	// Setup core module (players, matches, etc.)
+	coreModule := core.NewModule(config.DB)
+	coreModule.SetupRoutes(r)
+
+	// Start the scheduler for auto-validation
+	if err := coreModule.StartScheduler(); err != nil {
+		log.Fatalf("Failed to start scheduler: %v", err)
+	}
+
+	// Setup graceful shutdown
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	
+	go func() {
+		<-c
+		log.Println("Shutting down gracefully...")
+		coreModule.StopScheduler()
+		os.Exit(0)
+	}()
 
 	// Users routes (protected)
 	users := r.Group("/users")
@@ -64,6 +111,16 @@ func main() {
 	protected.Use(auth.JWTMiddleware())
 	{
 		protected.GET("/test", protectedTestHandler)
+	}
+
+	// Add admin endpoint to manually trigger auto-validation (for testing)
+	admin := r.Group("/admin")
+	admin.Use(auth.JWTMiddleware())
+	{
+		admin.POST("/auto-validate", func(c *gin.Context) {
+			coreModule.RunAutoValidationNow()
+			c.JSON(200, gin.H{"message": "Auto-validation triggered manually"})
+		})
 	}
 
 	port := os.Getenv("PORT")

@@ -3,6 +3,7 @@ package auth
 import (
 	"auth/handlers"
 	"auth/middleware"
+	"core/services"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -13,8 +14,9 @@ type Module struct {
 }
 
 func NewModule(db *gorm.DB) *Module {
+	playerService := services.NewPlayerService(db)
 	return &Module{
-		Handler: handlers.NewAuthHandler(db),
+		Handler: handlers.NewAuthHandler(db, playerService),
 	}
 }
 
