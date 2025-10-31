@@ -304,7 +304,6 @@ func (f *Fixtures) generateEloHistoryAndStreaks(users []authModels.User, matches
 	return nil
 }
 
-
 // ClearAllData removes all fixture data
 func (f *Fixtures) ClearAllData() error {
 	log.Println("Clearing all fixture data...")

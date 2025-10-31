@@ -139,6 +139,12 @@ type UpdateUserRequest struct {
 	Username string `json:"username" binding:"required"`
 }
 
+type PatchUserRequest struct {
+	Email   *string `json:"email,omitempty" binding:"omitempty,email"`
+	Roles   *Roles  `json:"roles,omitempty"`
+	Enabled *bool   `json:"enabled,omitempty"`
+}
+
 type UpdateUserResponse struct {
 	Success bool `json:"success"`
 	User    User `json:"user"`
