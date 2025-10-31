@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -563,4 +564,186 @@ func (h *AuthHandler) UpdateUser(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, user)
+}
+
+// @Summary Patch User Roles and Status
+// @Description Update user email, roles and enabled status (admin only)
+// @Tags user
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param id path uint true "User ID"
+// @Param request body models.PatchUserRequest true "User patch request"
+// @Success 200 {object} models.User
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 409 {object} map[string]string
+// @Router /users/{id} [patch]
+func (h *AuthHandler) PatchUser(c *gin.Context) {
+	var req models.PatchUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	currentUserID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	// Get current user to check permissions
+	var currentUser models.User
+	if err := h.DB.First(&currentUser, currentUserID).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Current user not found"})
+		return
+	}
+
+	// Check if user is admin or superAdmin
+	isAdmin := currentUser.HasRole(models.RoleAdmin) || currentUser.HasRole(models.RoleSuperAdmin)
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only admins can modify user data"})
+		return
+	}
+
+	// Get the ID from URL parameter
+	paramID := c.Param("id")
+	if paramID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID is required"})
+		return
+	}
+
+	// Find target user to update
+	var targetUser models.User
+	if err := h.DB.First(&targetUser, paramID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Update email if provided
+	if req.Email != nil {
+		// Check if email is already taken by another user
+		if *req.Email != targetUser.Email {
+			var existingUser models.User
+			if err := h.DB.Where("email = ? AND id != ?", *req.Email, targetUser.ID).First(&existingUser).Error; err == nil {
+				c.JSON(http.StatusConflict, gin.H{"error": "Email already exists"})
+				return
+			}
+		}
+		targetUser.Email = *req.Email
+	}
+
+	// Validate roles if provided
+	if req.Roles != nil {
+		for _, role := range *req.Roles {
+			if !models.IsValidRole(role) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid role: %s", role)})
+				return
+			}
+		}
+		targetUser.Roles = *req.Roles
+	}
+
+	// Update enabled status if provided
+	if req.Enabled != nil {
+		targetUser.Enabled = *req.Enabled
+	}
+
+	if err := h.DB.Save(&targetUser).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
+		return
+	}
+
+	c.JSON(http.StatusOK, targetUser)
+}
+
+// UserListResponse represents the paginated user list response
+type UserListResponse struct {
+	Users      []models.User `json:"users"`
+	Total      int64         `json:"total"`
+	Page       int           `json:"page"`
+	PerPage    int           `json:"per_page"`
+	TotalPages int           `json:"total_pages"`
+}
+
+// @Summary Get Users List
+// @Description Get paginated list of users with optional search
+// @Tags user
+// @Security BearerAuth
+// @Produce json
+// @Param page query int false "Page number (default: 1)" default(1)
+// @Param per_page query int false "Items per page (default: 10, max: 100)" default(10)
+// @Param search query string false "Search in username or email"
+// @Success 200 {object} UserListResponse
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Router /users [get]
+func (h *AuthHandler) GetUsers(c *gin.Context) {
+	// Check if user is authenticated
+	_, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	// Parse pagination parameters
+	pageStr := c.DefaultQuery("page", "1")
+	perPageStr := c.DefaultQuery("per_page", "10")
+	search := c.Query("search")
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid page parameter"})
+		return
+	}
+
+	perPage, err := strconv.Atoi(perPageStr)
+	if err != nil || perPage < 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid per_page parameter"})
+		return
+	}
+
+	// Limit per_page to maximum 100
+	if perPage > 100 {
+		perPage = 100
+	}
+
+	// Calculate offset
+	offset := (page - 1) * perPage
+
+	// Build query with search
+	query := h.DB.Model(&models.User{})
+	if search != "" {
+		searchPattern := "%" + search + "%"
+		query = query.Where("username ILIKE ? OR email ILIKE ?", searchPattern, searchPattern)
+	}
+
+	// Get total count with search filter
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count users"})
+		return
+	}
+
+	// Get paginated users with search filter
+	var users []models.User
+	if err := query.Offset(offset).Limit(perPage).Find(&users).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve users"})
+		return
+	}
+
+	// Calculate total pages
+	totalPages := int((total + int64(perPage) - 1) / int64(perPage))
+
+	response := UserListResponse{
+		Users:      users,
+		Total:      total,
+		Page:       page,
+		PerPage:    perPage,
+		TotalPages: totalPages,
+	}
+
+	c.JSON(http.StatusOK, response)
 }

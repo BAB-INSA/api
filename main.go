@@ -86,7 +86,7 @@ func main() {
 	// Setup graceful shutdown
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	
+
 	go func() {
 		<-c
 		log.Println("Shutting down gracefully...")
@@ -98,8 +98,10 @@ func main() {
 	users := r.Group("/users")
 	users.Use(auth.JWTMiddleware())
 	{
+		users.GET("", authModule.Handler.GetUsers)
 		users.GET("/me", authModule.Handler.Profile)
 		users.PUT("/:id", authModule.Handler.UpdateUser)
+		users.PATCH("/:id", authModule.Handler.PatchUser)
 	}
 
 	// Swagger endpoint
