@@ -11,7 +11,7 @@ type Match struct {
 	Player1ID   uint           `gorm:"not null;constraint:OnDelete:CASCADE" json:"player1_id"`
 	Player2ID   uint           `gorm:"not null;constraint:OnDelete:CASCADE" json:"player2_id"`
 	WinnerID    uint           `gorm:"not null;constraint:OnDelete:CASCADE" json:"winner_id"`
-	Status      string         `gorm:"size:20;default:pending" json:"status"` // pending, confirmed, rejected
+	Status      string         `gorm:"size:20;default:pending" json:"status"` // pending, confirmed, rejected, cancelled
 	CreatedAt   time.Time      `json:"created_at"`
 	ConfirmedAt *time.Time     `json:"confirmed_at"`
 	UpdatedAt   time.Time      `json:"updated_at"`
@@ -42,5 +42,6 @@ type CreateMatchRequest struct {
 }
 
 type UpdateMatchStatusRequest struct {
-	Status string `json:"status" binding:"required,oneof=confirmed rejected"`
+	Status   *string `json:"status,omitempty" binding:"omitempty,oneof=confirmed rejected cancelled"`
+	WinnerID *uint   `json:"winner_id,omitempty"`
 }
