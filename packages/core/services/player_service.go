@@ -79,57 +79,6 @@ func (s *PlayerService) GetTopPlayersByElo(limit int) ([]models.Player, error) {
 	return players, nil
 }
 
-func (s *PlayerService) UpdateWinStreak(playerID uint, isWin bool) error {
-	var player models.Player
-	
-	result := s.db.First(&player, playerID)
-	if result.Error != nil {
-		return result.Error
-	}
-
-	if isWin {
-		// Victoire : incrémenter la série actuelle
-		player.CurrentWinStreak++
-		// Mettre à jour la meilleure série si nécessaire
-		if player.CurrentWinStreak > player.BestWinStreak {
-			player.BestWinStreak = player.CurrentWinStreak
-		}
-	} else {
-		// Défaite : remettre la série actuelle à zéro
-		player.CurrentWinStreak = 0
-	}
-
-	return s.db.Save(&player).Error
-}
-
-func (s *PlayerService) GetTopPlayersByCurrentStreak(limit int) ([]models.Player, error) {
-	var players []models.Player
-	
-	result := s.db.Order("current_win_streak DESC").
-		Where("current_win_streak > 0").
-		Limit(limit).
-		Find(&players)
-	
-	if result.Error != nil {
-		return nil, result.Error
-	}
-
-	return players, nil
-}
-
-func (s *PlayerService) GetTopPlayersByBestStreak(limit int) ([]models.Player, error) {
-	var players []models.Player
-	
-	result := s.db.Order("best_win_streak DESC").
-		Limit(limit).
-		Find(&players)
-	
-	if result.Error != nil {
-		return nil, result.Error
-	}
-
-	return players, nil
-}
 
 func (s *PlayerService) GetPlayerMatches(playerID uint, filter string, page int, pageSize int) (*models.PaginatedMatchResponse, error) {
 	var matches []models.Match

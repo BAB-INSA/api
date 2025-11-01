@@ -13,8 +13,6 @@ type Player struct {
 	TotalMatches     int            `gorm:"default:0" json:"total_matches"`
 	Wins             int            `gorm:"default:0" json:"wins"`
 	Losses           int            `gorm:"default:0" json:"losses"`
-	CurrentWinStreak int            `gorm:"default:0" json:"current_win_streak"`
-	BestWinStreak    int            `gorm:"default:0" json:"best_win_streak"`
 	CreatedAt        time.Time      `json:"created_at"`
 	UpdatedAt        time.Time      `json:"updated_at"`
 	DeletedAt        gorm.DeletedAt `gorm:"index" json:"-"`
