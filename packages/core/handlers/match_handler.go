@@ -183,7 +183,7 @@ func (h *MatchHandler) CreateMatch(c *gin.Context) {
 	}
 
 	var req models.CreateMatchRequest
-	
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Invalid request body",
@@ -213,9 +213,9 @@ func (h *MatchHandler) CreateMatch(c *gin.Context) {
 			})
 			return
 		}
-		
-		if err.Error() == "player1 and player2 must be different" || 
-		   err.Error() == "winner must be either player1 or player2" {
+
+		if err.Error() == "player1 and player2 must be different" ||
+			err.Error() == "winner must be either player1 or player2" {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": err.Error(),
 			})

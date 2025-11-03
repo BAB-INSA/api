@@ -30,13 +30,13 @@ type Module struct {
 func NewModule(db *gorm.DB) *Module {
 	playerService := services.NewPlayerService(db)
 	playerHandler := handlers.NewPlayerHandler(playerService)
-	
+
 	matchService := services.NewMatchService(db)
 	matchHandler := handlers.NewMatchHandler(matchService, db)
-	
+
 	eloHistoryService := services.NewEloHistoryService(db)
 	eloHistoryHandler := handlers.NewEloHistoryHandler(eloHistoryService)
-	
+
 	statsService := services.NewStatsService(db)
 	statsHandler := handlers.NewStatsHandler(statsService)
 

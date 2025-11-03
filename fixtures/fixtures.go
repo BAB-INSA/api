@@ -86,14 +86,12 @@ func (f *Fixtures) generateUsers() ([]authModels.User, error) {
 		// Create corresponding player with fixed ELO based on index
 		baseElos := []float64{1200, 1250, 1180, 1320, 1150, 1280, 1220, 1350, 1100, 1300}
 		player := models.Player{
-			ID:               userID, // Same ID as user
-			Username:         user.Username,
-			EloRating:        baseElos[i],
-			TotalMatches:     0, // Will be updated when matches are created
-			Wins:             0,
-			Losses:           0,
-			CurrentWinStreak: 0,
-			BestWinStreak:    0,
+			ID:           userID, // Same ID as user
+			Username:     user.Username,
+			EloRating:    baseElos[i],
+			TotalMatches: 0, // Will be updated when matches are created
+			Wins:         0,
+			Losses:       0,
 		}
 
 		if err := f.db.Create(&player).Error; err != nil {
@@ -291,12 +289,10 @@ func (f *Fixtures) generateEloHistoryAndStreaks(users []authModels.User, matches
 	for _, player := range players {
 		playerID := player.ID
 		f.db.Model(&models.Player{}).Where("id = ?", playerID).Updates(map[string]interface{}{
-			"elo_rating":         playerElos[playerID],
-			"total_matches":      playerTotalMatches[playerID],
-			"wins":               playerWins[playerID],
-			"losses":             playerLosses[playerID],
-			"current_win_streak": playerCurrentStreaks[playerID],
-			"best_win_streak":    playerBestStreaks[playerID],
+			"elo_rating":    playerElos[playerID],
+			"total_matches": playerTotalMatches[playerID],
+			"wins":          playerWins[playerID],
+			"losses":        playerLosses[playerID],
 		})
 	}
 

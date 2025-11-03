@@ -15,7 +15,7 @@ type Scheduler struct {
 func NewScheduler(autoValidationService *services.AutoValidationService) *Scheduler {
 	// Create cron with seconds precision and logging
 	c := cron.New(cron.WithSeconds(), cron.WithLogger(cron.VerbosePrintfLogger(log.Default())))
-	
+
 	return &Scheduler{
 		cron:                  c,
 		autoValidationService: autoValidationService,
@@ -39,7 +39,7 @@ func (s *Scheduler) Start() error {
 
 	s.cron.Start()
 	log.Println("Cron scheduler started successfully")
-	
+
 	return nil
 }
 
@@ -53,28 +53,28 @@ func (s *Scheduler) Stop() {
 // runAutoValidation is the job function that validates expired matches
 func (s *Scheduler) runAutoValidation() {
 	log.Println("Running auto-validation job...")
-	
+
 	// Check how many expired matches we have before processing
 	expiredCount, err := s.autoValidationService.GetExpiredMatchesCount()
 	if err != nil {
 		log.Printf("Error checking expired matches count: %v", err)
 		return
 	}
-	
+
 	if expiredCount == 0 {
 		log.Println("No expired matches to validate")
 		return
 	}
-	
+
 	log.Printf("Found %d expired matches to validate", expiredCount)
-	
+
 	// Run the validation
 	err = s.autoValidationService.ValidateExpiredMatches()
 	if err != nil {
 		log.Printf("Error during auto-validation: %v", err)
 		return
 	}
-	
+
 	log.Println("Auto-validation job completed successfully")
 }
 
