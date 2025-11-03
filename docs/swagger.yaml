@@ -206,12 +206,8 @@ definitions:
     type: object
   models.Player:
     properties:
-      best_win_streak:
-        type: integer
       created_at:
         type: string
-      current_win_streak:
-        type: integer
       elo_history:
         items:
           $ref: '#/definitions/models.EloHistory'
@@ -891,7 +887,7 @@ paths:
       tags:
       - matches
   /matches/{id}/cancel:
-    put:
+    patch:
       description: Cancel a match by setting its status to cancelled. Only admin can
         cancel matches.
       parameters:
@@ -1229,70 +1225,6 @@ paths:
               type: string
             type: object
       summary: Get top players by ELO rating
-      tags:
-      - players
-  /players/top-best-streak:
-    get:
-      description: Get top N players ordered by best win streak (highest first)
-      parameters:
-      - description: 'Number of players to retrieve (default: 10, max: 100)'
-        in: query
-        name: limit
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/models.Player'
-            type: array
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Get top players by best win streak
-      tags:
-      - players
-  /players/top-current-streak:
-    get:
-      description: Get top N players ordered by current win streak (highest first)
-      parameters:
-      - description: 'Number of players to retrieve (default: 10, max: 100)'
-        in: query
-        name: limit
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/models.Player'
-            type: array
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Get top players by current win streak
       tags:
       - players
   /protected/test:
