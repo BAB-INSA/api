@@ -48,6 +48,13 @@ func main() {
 
 	r := gin.Default()
 
+	// Configure trusted proxies for security
+	trustedProxies := []string{"127.0.0.1", "::1"}
+	if apacheIP := os.Getenv("APACHE_PROXY_IP"); apacheIP != "" {
+		trustedProxies = append(trustedProxies, apacheIP)
+	}
+	r.SetTrustedProxies(trustedProxies)
+
 	// Get CORS allowed origins from environment
 	corsOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
 	var allowedOrigins []string

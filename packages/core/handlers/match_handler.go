@@ -471,7 +471,7 @@ func (h *MatchHandler) RejectMatch(c *gin.Context) {
 // @Failure 403 {object} map[string]string
 // @Failure 404 {object} map[string]string
 // @Failure 500 {object} map[string]string
-// @Router /matches/{id}/cancel [put]
+// @Router /matches/{id}/cancel [patch]
 func (h *MatchHandler) CancelMatch(c *gin.Context) {
 	// Get authenticated user ID
 	userID, exists := authMiddleware.GetUserID(c)

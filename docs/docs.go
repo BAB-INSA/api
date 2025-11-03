@@ -887,7 +887,7 @@ const docTemplate = `{
             }
         },
         "/matches/{id}/cancel": {
-            "put": {
+            "patch": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -1118,104 +1118,6 @@ const docTemplate = `{
                     "players"
                 ],
                 "summary": "Get top players by ELO rating",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Number of players to retrieve (default: 10, max: 100)",
-                        "name": "limit",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.Player"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/players/top-best-streak": {
-            "get": {
-                "description": "Get top N players ordered by best win streak (highest first)",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "players"
-                ],
-                "summary": "Get top players by best win streak",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Number of players to retrieve (default: 10, max: 100)",
-                        "name": "limit",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.Player"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/players/top-current-streak": {
-            "get": {
-                "description": "Get top N players ordered by current win streak (highest first)",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "players"
-                ],
-                "summary": "Get top players by current win streak",
                 "parameters": [
                     {
                         "type": "integer",
@@ -2120,14 +2022,8 @@ const docTemplate = `{
         "models.Player": {
             "type": "object",
             "properties": {
-                "best_win_streak": {
-                    "type": "integer"
-                },
                 "created_at": {
                     "type": "string"
-                },
-                "current_win_streak": {
-                    "type": "integer"
                 },
                 "elo_history": {
                     "type": "array",
