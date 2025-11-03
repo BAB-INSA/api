@@ -78,12 +78,51 @@ Une fois le serveur démarré, accédez à la documentation Swagger interactive 
 go build
 ```
 
-### Migrations
+### Migrations et fixtures
+
+#### Migrations
 ```bash
 make migrate          # Exécuter les migrations
 make rollback         # Annuler la dernière migration
 make rollback STEPS=3 # Annuler 3 migrations
 make migration-status # Voir le statut des migrations
+
+# Ou avec les binaires compilés en production
+go build -o migrate-binary cmd/migrate.go
+./migrate-binary migrate
+./migrate-binary status
+./migrate-binary rollback
+```
+
+#### Fixtures (données de test)
+```bash
+# Avec go run
+go run cmd/fixtures.go generate    # Générer des données de test
+go run cmd/fixtures.go clear       # Vider toutes les données
+go run cmd/fixtures.go regenerate  # Vider et regénérer
+
+# Ou avec un binaire compilé en production
+go build -o fixtures-binary cmd/fixtures.go
+./fixtures-binary generate
+./fixtures-binary clear
+./fixtures-binary regenerate
+```
+
+#### Déploiement
+```bash
+# 1. Compiler les binaires
+go build -o bab-insa-api main.go
+go build -o migrate-binary cmd/migrate.go
+go build -o fixtures-binary cmd/fixtures.go   # Disponible mais pas exécuté automatiquement
+
+# 2. Exécuter les migrations
+./migrate-binary migrate
+
+# 3. Démarrer l'API
+./bab-insa-api
+
+# 4. Fixtures (manuel, si besoin)
+./fixtures-binary generate    # À exécuter manuellement selon les besoins
 ```
 
 ### Documentation

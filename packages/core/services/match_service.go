@@ -21,14 +21,14 @@ func NewMatchService(db *gorm.DB) *MatchService {
 
 func (s *MatchService) GetRecentMatches(limit int) ([]models.Match, error) {
 	var matches []models.Match
-	
+
 	result := s.db.Order("created_at DESC").
 		Limit(limit).
 		Preload("Player1").
 		Preload("Player2").
 		Preload("Winner").
 		Find(&matches)
-	
+
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -37,12 +37,12 @@ func (s *MatchService) GetRecentMatches(limit int) ([]models.Match, error) {
 }
 
 type MatchFilters struct {
-	PlayerID  *uint      `json:"player_id,omitempty"`
-	Status    *string    `json:"status,omitempty"`
-	DateFrom  *time.Time `json:"date_from,omitempty"`
-	DateTo    *time.Time `json:"date_to,omitempty"`
-	Page      int        `json:"page"`
-	PerPage   int        `json:"per_page"`
+	PlayerID *uint      `json:"player_id,omitempty"`
+	Status   *string    `json:"status,omitempty"`
+	DateFrom *time.Time `json:"date_from,omitempty"`
+	DateTo   *time.Time `json:"date_to,omitempty"`
+	Page     int        `json:"page"`
+	PerPage  int        `json:"per_page"`
 }
 
 func (s *MatchService) GetMatches(filters MatchFilters) (*models.PaginatedMatchResponse, error) {
@@ -114,7 +114,7 @@ func (s *MatchService) CreateMatch(req models.CreateMatchRequest) (*models.Match
 		}
 		return nil, err
 	}
-	
+
 	if err := s.db.First(&player2, req.Player2ID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("player2 not found")
@@ -298,7 +298,7 @@ func (s *MatchService) updatePlayerStatsInTransaction(tx *gorm.DB, player1ID, pl
 	if err := tx.Model(&models.Player{}).Where("id = ?", player1ID).Update("elo_rating", gorm.Expr("elo_rating + ?", player1Change)).Error; err != nil {
 		return err
 	}
-	
+
 	if err := tx.Model(&models.Player{}).Where("id = ?", player2ID).Update("elo_rating", gorm.Expr("elo_rating + ?", player2Change)).Error; err != nil {
 		return err
 	}
@@ -342,7 +342,6 @@ func (s *MatchService) reversePlayerStatsInTransaction(tx *gorm.DB, player1ID, p
 	if err := tx.Model(&models.Player{}).Where("id = ?", loserID).Update("losses", gorm.Expr("losses - 1")).Error; err != nil {
 		return err
 	}
-
 
 	return nil
 }

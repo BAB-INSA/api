@@ -19,7 +19,7 @@ func NewPlayerService(db *gorm.DB) *PlayerService {
 
 func (s *PlayerService) GetPlayerByID(id uint) (*models.Player, error) {
 	var player models.Player
-	
+
 	result := s.db.First(&player, id)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -51,13 +51,13 @@ func (s *PlayerService) CreatePlayer(userID uint, username string) (*models.Play
 
 func (s *PlayerService) GetEloHistoryByPlayerID(playerID uint) ([]models.EloHistory, error) {
 	var eloHistory []models.EloHistory
-	
+
 	result := s.db.Where("player_id = ?", playerID).
 		Order("id ASC").
 		Preload("Match").
 		Preload("Opponent").
 		Find(&eloHistory)
-	
+
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -67,11 +67,11 @@ func (s *PlayerService) GetEloHistoryByPlayerID(playerID uint) ([]models.EloHist
 
 func (s *PlayerService) GetTopPlayersByElo(limit int) ([]models.Player, error) {
 	var players []models.Player
-	
+
 	result := s.db.Order("elo_rating DESC").
 		Limit(limit).
 		Find(&players)
-	
+
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -79,28 +79,27 @@ func (s *PlayerService) GetTopPlayersByElo(limit int) ([]models.Player, error) {
 	return players, nil
 }
 
-
 func (s *PlayerService) GetPlayerMatches(playerID uint, filter string, page int, pageSize int) (*models.PaginatedMatchResponse, error) {
 	var matches []models.Match
 	var total int64
-	
+
 	baseQuery := s.db.Model(&models.Match{}).Where("player1_id = ? OR player2_id = ?", playerID, playerID)
-	
+
 	switch filter {
 	case "wins":
 		baseQuery = baseQuery.Where("winner_id = ?", playerID)
 	case "losses":
 		baseQuery = baseQuery.Where("winner_id != ? AND (player1_id = ? OR player2_id = ?)", playerID, playerID, playerID)
 	}
-	
+
 	// Count total records
 	if err := baseQuery.Count(&total).Error; err != nil {
 		return nil, err
 	}
-	
+
 	// Calculate offset
 	offset := (page - 1) * pageSize
-	
+
 	// Get paginated matches
 	query := baseQuery.Order("created_at DESC").
 		Preload("Player1").
@@ -108,14 +107,14 @@ func (s *PlayerService) GetPlayerMatches(playerID uint, filter string, page int,
 		Preload("Winner").
 		Offset(offset).
 		Limit(pageSize)
-	
+
 	if err := query.Find(&matches).Error; err != nil {
 		return nil, err
 	}
-	
+
 	// Calculate total pages
 	totalPages := int((total + int64(pageSize) - 1) / int64(pageSize))
-	
+
 	return &models.PaginatedMatchResponse{
 		Data:       matches,
 		Total:      total,
@@ -128,34 +127,34 @@ func (s *PlayerService) GetPlayerMatches(playerID uint, filter string, page int,
 func (s *PlayerService) GetAllPlayers(orderBy string, direction string, page int, pageSize int) (*models.PaginatedPlayersResponse, error) {
 	var players []models.Player
 	var total int64
-	
+
 	// Validate order by field
 	allowedOrderBy := map[string]bool{
-		"created_at":  true,
-		"elo_rating":  true,
-		"username":    true,
+		"created_at": true,
+		"elo_rating": true,
+		"username":   true,
 	}
-	
+
 	if !allowedOrderBy[orderBy] {
 		orderBy = "created_at"
 	}
-	
+
 	// Validate direction
 	if direction != "ASC" && direction != "DESC" {
 		direction = "DESC"
 	}
-	
+
 	// Count total records
 	if err := s.db.Model(&models.Player{}).Count(&total).Error; err != nil {
 		return nil, err
 	}
-	
+
 	// Calculate offset
 	offset := (page - 1) * pageSize
-	
+
 	// Build order clause
 	orderClause := orderBy + " " + direction
-	
+
 	// Get paginated players
 	if err := s.db.Order(orderClause).
 		Offset(offset).
@@ -163,10 +162,10 @@ func (s *PlayerService) GetAllPlayers(orderBy string, direction string, page int
 		Find(&players).Error; err != nil {
 		return nil, err
 	}
-	
+
 	// Calculate total pages
 	totalPages := int((total + int64(pageSize) - 1) / int64(pageSize))
-	
+
 	return &models.PaginatedPlayersResponse{
 		Data:       players,
 		Total:      total,
@@ -175,5 +174,3 @@ func (s *PlayerService) GetAllPlayers(orderBy string, direction string, page int
 		TotalPages: totalPages,
 	}, nil
 }
-
-

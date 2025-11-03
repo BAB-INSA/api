@@ -28,7 +28,7 @@ func (s *AutoValidationService) ValidateExpiredMatches() error {
 	// Find all pending matches older than 24 hours
 	var expiredMatches []models.Match
 	result := s.db.Where("status = ? AND created_at < ?", "pending", cutoffTime).Find(&expiredMatches)
-	
+
 	if result.Error != nil {
 		log.Printf("Error finding expired matches: %v", result.Error)
 		return result.Error
@@ -44,14 +44,14 @@ func (s *AutoValidationService) ValidateExpiredMatches() error {
 	// Confirm each expired match
 	for _, match := range expiredMatches {
 		log.Printf("Auto-confirming match ID %d (created at %v)", match.ID, match.CreatedAt)
-		
+
 		_, err := s.matchService.ConfirmMatch(match.ID)
 		if err != nil {
 			log.Printf("Error auto-confirming match ID %d: %v", match.ID, err)
 			// Continue with other matches even if one fails
 			continue
 		}
-		
+
 		log.Printf("Successfully auto-confirmed match ID %d", match.ID)
 	}
 
@@ -62,24 +62,24 @@ func (s *AutoValidationService) ValidateExpiredMatches() error {
 func (s *AutoValidationService) GetPendingMatchesCount() (int64, error) {
 	var count int64
 	result := s.db.Model(&models.Match{}).Where("status = ?", "pending").Count(&count)
-	
+
 	if result.Error != nil {
 		return 0, result.Error
 	}
-	
+
 	return count, nil
 }
 
 // GetExpiredMatchesCount returns the number of pending matches older than 24 hours
 func (s *AutoValidationService) GetExpiredMatchesCount() (int64, error) {
 	cutoffTime := time.Now().Add(-24 * time.Hour)
-	
+
 	var count int64
 	result := s.db.Model(&models.Match{}).Where("status = ? AND created_at < ?", "pending", cutoffTime).Count(&count)
-	
+
 	if result.Error != nil {
 		return 0, result.Error
 	}
-	
+
 	return count, nil
 }

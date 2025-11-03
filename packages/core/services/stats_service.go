@@ -54,9 +54,9 @@ func (s *StatsService) GetStats() (*models.Stats, error) {
 	}
 
 	stats := &models.Stats{
-		TotalPlayers:        totalPlayers,
-		TotalMatches:        totalMatches,
-		MatchesLast7Days:    matchesLast7Days,
+		TotalPlayers:         totalPlayers,
+		TotalMatches:         totalMatches,
+		MatchesLast7Days:     matchesLast7Days,
 		MatchesPrevious7Days: matchesPrevious7Days,
 	}
 

@@ -140,7 +140,6 @@ func (h *PlayerHandler) GetTopPlayers(c *gin.Context) {
 	c.JSON(http.StatusOK, players)
 }
 
-
 // GetPlayerMatches retrieves matches for a specific player with pagination
 // @Summary Get matches for a player
 // @Description Get matches for a specific player, ordered from newest to oldest, with optional filtering and pagination
@@ -185,7 +184,7 @@ func (h *PlayerHandler) GetPlayerMatches(c *gin.Context) {
 	var filter string
 	wins := c.Query("wins")
 	losses := c.Query("losses")
-	
+
 	if wins == "1" && losses == "1" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Cannot filter for both wins and losses at the same time",
@@ -250,10 +249,10 @@ func (h *PlayerHandler) GetPlayerMatches(c *gin.Context) {
 func (h *PlayerHandler) GetAllPlayers(c *gin.Context) {
 	// Get orderBy parameter
 	orderBy := c.DefaultQuery("orderBy", "created_at")
-	
+
 	// Get direction parameter
 	direction := c.DefaultQuery("direction", "DESC")
-	
+
 	// Get page parameter
 	pageStr := c.DefaultQuery("page", "1")
 	page, err := strconv.Atoi(pageStr)
@@ -290,4 +289,3 @@ func (h *PlayerHandler) GetAllPlayers(c *gin.Context) {
 
 	c.JSON(http.StatusOK, paginatedResponse)
 }
-
