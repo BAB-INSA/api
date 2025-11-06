@@ -1110,7 +1110,7 @@ const docTemplate = `{
         },
         "/players/top": {
             "get": {
-                "description": "Get top N players ordered by ELO rating (highest first)",
+                "description": "Get top N players ordered by ELO rating (highest first), with option to include current user",
                 "produces": [
                     "application/json"
                 ],
@@ -1123,6 +1123,12 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "Number of players to retrieve (default: 10, max: 100)",
                         "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include current user in results even if not in top (default: false)",
+                        "name": "includeCurrentUser",
                         "in": "query"
                     }
                 ],

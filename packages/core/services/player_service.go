@@ -65,7 +65,7 @@ func (s *PlayerService) GetEloHistoryByPlayerID(playerID uint) ([]models.EloHist
 	return eloHistory, nil
 }
 
-func (s *PlayerService) GetTopPlayersByElo(limit int) ([]models.Player, error) {
+func (s *PlayerService) GetTopPlayersByElo(limit int, currentUserID *uint) ([]models.Player, error) {
 	var players []models.Player
 
 	result := s.db.Order("elo_rating DESC").
@@ -74,6 +74,26 @@ func (s *PlayerService) GetTopPlayersByElo(limit int) ([]models.Player, error) {
 
 	if result.Error != nil {
 		return nil, result.Error
+	}
+
+	// Si currentUserID est fourni et que l'utilisateur n'est pas dans le top, l'ajouter
+	if currentUserID != nil {
+		// Vérifier si l'utilisateur connecté est déjà dans la liste
+		userInTop := false
+		for _, player := range players {
+			if player.ID == *currentUserID {
+				userInTop = true
+				break
+			}
+		}
+
+		// Si l'utilisateur n'est pas dans le top, le récupérer et l'ajouter
+		if !userInTop {
+			var currentUser models.Player
+			if err := s.db.First(&currentUser, *currentUserID).Error; err == nil {
+				players = append(players, currentUser)
+			}
+		}
 	}
 
 	return players, nil
@@ -173,4 +193,34 @@ func (s *PlayerService) GetAllPlayers(orderBy string, direction string, page int
 		PageSize:   pageSize,
 		TotalPages: totalPages,
 	}, nil
+}
+
+// RecalculateAllRanks recalcule les rangs de tous les joueurs basés sur leur ELO
+// Gère les égalités : joueurs avec même ELO ont le même rang
+func (s *PlayerService) RecalculateAllRanks() error {
+	// Récupérer tous les joueurs triés par ELO décroissant
+	var players []models.Player
+	if err := s.db.Order("elo_rating DESC, id ASC").Find(&players).Error; err != nil {
+		return err
+	}
+
+	// Calculer les rangs avec gestion des égalités
+	currentRank := 1
+	var previousElo float64
+	
+	for i, player := range players {
+		// Si ce n'est pas le premier joueur et que l'ELO est différent du précédent
+		if i > 0 && player.EloRating != previousElo {
+			currentRank = i + 1
+		}
+		
+		// Mettre à jour le rang du joueur
+		if err := s.db.Model(&player).Update("rank", currentRank).Error; err != nil {
+			return err
+		}
+		
+		previousElo = player.EloRating
+	}
+
+	return nil
 }

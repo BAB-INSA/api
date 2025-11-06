@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
+	authMiddleware "auth/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -106,10 +107,11 @@ func (h *PlayerHandler) GetEloHistory(c *gin.Context) {
 
 // GetTopPlayers retrieves top N players by ELO rating
 // @Summary Get top players by ELO rating
-// @Description Get top N players ordered by ELO rating (highest first)
+// @Description Get top N players ordered by ELO rating (highest first), with option to include current user
 // @Tags players
 // @Produce json
 // @Param limit query int false "Number of players to retrieve (default: 10, max: 100)"
+// @Param includeCurrentUser query bool false "Include current user in results even if not in top (default: false)"
 // @Success 200 {array} models.Player
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
@@ -129,7 +131,25 @@ func (h *PlayerHandler) GetTopPlayers(c *gin.Context) {
 		limit = 100
 	}
 
-	players, err := h.playerService.GetTopPlayersByElo(limit)
+	// Vérifier si on doit inclure l'utilisateur connecté
+	includeCurrentUserStr := c.DefaultQuery("includeCurrentUser", "false")
+	includeCurrentUser, err := strconv.ParseBool(includeCurrentUserStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid includeCurrentUser parameter",
+		})
+		return
+	}
+
+	var currentUserID *uint
+	if includeCurrentUser {
+		// Récupérer l'ID de l'utilisateur connecté depuis le contexte JWT
+		if userID, exists := authMiddleware.GetUserID(c); exists {
+			currentUserID = &userID
+		}
+	}
+
+	players, err := h.playerService.GetTopPlayersByElo(limit, currentUserID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to retrieve top players",

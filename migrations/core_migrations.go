@@ -97,5 +97,28 @@ func GetCoreMigrations() []MigrationDefinition {
 				return nil
 			},
 		},
+		{
+			Name: "2024_11_06_000000_add_rank_to_players",
+			Up: func(db *gorm.DB) error {
+				// Add rank column to players table
+				if err := db.Exec(`
+					ALTER TABLE players ADD COLUMN IF NOT EXISTS rank INT DEFAULT 1;
+					CREATE INDEX IF NOT EXISTS idx_players_rank ON players(rank);
+				`).Error; err != nil {
+					return err
+				}
+				return nil
+			},
+			Down: func(db *gorm.DB) error {
+				// Remove rank column from players table
+				if err := db.Exec(`
+					DROP INDEX IF EXISTS idx_players_rank;
+					ALTER TABLE players DROP COLUMN IF EXISTS rank;
+				`).Error; err != nil {
+					return err
+				}
+				return nil
+			},
+		},
 	}
 }
