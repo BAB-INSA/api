@@ -10,12 +10,14 @@ import (
 )
 
 type MatchService struct {
-	db *gorm.DB
+	db            *gorm.DB
+	playerService *PlayerService
 }
 
 func NewMatchService(db *gorm.DB) *MatchService {
 	return &MatchService{
-		db: db,
+		db:            db,
+		playerService: NewPlayerService(db),
 	}
 }
 
@@ -285,6 +287,14 @@ func (s *MatchService) UpdateMatchStatus(matchID uint, req models.UpdateMatchSta
 		return nil, err
 	}
 
+	// If match was confirmed, recalculate all player ranks
+	if match.Status == "confirmed" {
+		if err := s.playerService.RecalculateAllRanks(); err != nil {
+			// Log error but don't fail the request since the match was already processed
+			// In production, you might want to use a proper logger
+		}
+	}
+
 	// Load the updated match with relationships
 	if err := s.db.Preload("Player1").Preload("Player2").Preload("Winner").First(&match, match.ID).Error; err != nil {
 		return nil, err
@@ -527,9 +537,20 @@ func (s *MatchService) DeleteMatch(matchID uint) (*models.Match, error) {
 		return nil, err
 	}
 
+	// Store whether the match was confirmed before committing
+	wasConfirmed := match.Status == "confirmed"
+
 	// Commit transaction
 	if err := tx.Commit().Error; err != nil {
 		return nil, err
+	}
+
+	// If match was confirmed, recalculate all player ranks since ELO changed
+	if wasConfirmed {
+		if err := s.playerService.RecalculateAllRanks(); err != nil {
+			// Log error but don't fail the request since the match was already processed
+			// In production, you might want to use a proper logger
+		}
 	}
 
 	// Load the deleted match with relationships using Unscoped

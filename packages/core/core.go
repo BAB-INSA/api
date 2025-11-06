@@ -63,7 +63,7 @@ func (m *Module) SetupRoutes(r *gin.Engine) {
 	players := r.Group("/players")
 	{
 		players.GET("", m.PlayerHandler.GetAllPlayers)
-		players.GET("/top", m.PlayerHandler.GetTopPlayers)
+		players.GET("/top", authMiddleware.OptionalJWTMiddleware(), m.PlayerHandler.GetTopPlayers)
 		players.GET("/:id", m.PlayerHandler.GetPlayer)
 		players.GET("/:id/elo-history", m.PlayerHandler.GetEloHistory)
 		players.GET("/:id/matches", m.PlayerHandler.GetPlayerMatches)

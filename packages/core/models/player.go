@@ -10,6 +10,7 @@ type Player struct {
 	ID           uint           `gorm:"primaryKey" json:"id"`
 	Username     string         `gorm:"size:255;not null" json:"username"`
 	EloRating    float64        `gorm:"default:1200" json:"elo_rating"`
+	Rank         int            `gorm:"default:1" json:"rank"`
 	TotalMatches int            `gorm:"default:0" json:"total_matches"`
 	Wins         int            `gorm:"default:0" json:"wins"`
 	Losses       int            `gorm:"default:0" json:"losses"`

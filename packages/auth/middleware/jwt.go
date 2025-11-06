@@ -54,3 +54,35 @@ func GetUserEmail(c *gin.Context) (string, bool) {
 	}
 	return email.(string), true
 }
+
+// OptionalJWTMiddleware processes JWT token if present but doesn't require it
+func OptionalJWTMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			// No token provided, continue without setting user context
+			c.Next()
+			return
+		}
+
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			// Invalid format, continue without setting user context
+			c.Next()
+			return
+		}
+
+		tokenString := parts[1]
+		claims, err := utils.ValidateToken(tokenString)
+		if err != nil {
+			// Invalid token, continue without setting user context
+			c.Next()
+			return
+		}
+
+		// Valid token, set user context
+		c.Set("user_id", claims.UserID)
+		c.Set("user_email", claims.Email)
+		c.Next()
+	}
+}
