@@ -207,18 +207,18 @@ func (s *PlayerService) RecalculateAllRanks() error {
 	// Calculer les rangs avec gestion des égalités
 	currentRank := 1
 	var previousElo float64
-	
+
 	for i, player := range players {
 		// Si ce n'est pas le premier joueur et que l'ELO est différent du précédent
 		if i > 0 && player.EloRating != previousElo {
 			currentRank = i + 1
 		}
-		
+
 		// Mettre à jour le rang du joueur
 		if err := s.db.Model(&player).Update("rank", currentRank).Error; err != nil {
 			return err
 		}
-		
+
 		previousElo = player.EloRating
 	}
 

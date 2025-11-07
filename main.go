@@ -53,7 +53,9 @@ func main() {
 	if apacheIP := os.Getenv("APACHE_PROXY_IP"); apacheIP != "" {
 		trustedProxies = append(trustedProxies, apacheIP)
 	}
-	r.SetTrustedProxies(trustedProxies)
+	if err := r.SetTrustedProxies(trustedProxies); err != nil {
+		log.Fatal("Failed to set trusted proxies:", err)
+	}
 
 	// Get CORS allowed origins from environment
 	corsOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
@@ -138,7 +140,9 @@ func main() {
 	}
 
 	log.Printf("Server starting on port %s", port)
-	r.Run(":" + port)
+	if err := r.Run(":" + port); err != nil {
+		log.Fatal("Failed to start server:", err)
+	}
 }
 
 // HealthResponse represents the health check response
