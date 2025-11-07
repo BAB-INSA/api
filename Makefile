@@ -41,19 +41,19 @@ dev: ## Lancer en mode développement avec auto-rebuild
 
 migrate: ## Exécuter les migrations
 	@echo "Exécution des migrations..."
-	go run cmd/migrate.go migrate
+	go run cmd/migrate/migrate.go migrate
 
 rollback: ## Annuler les migrations (usage: make rollback STEPS=2)
 	@echo "Annulation des migrations..."
 	@if [ -z "$(STEPS)" ]; then \
-		go run cmd/migrate.go rollback; \
+		go run cmd/migrate/migrate.go rollback; \
 	else \
-		go run cmd/migrate.go rollback $(STEPS); \
+		go run cmd/migrate/migrate.go rollback $(STEPS); \
 	fi
 
 migration-status: ## Afficher le statut des migrations
 	@echo "Statut des migrations:"
-	go run cmd/migrate.go status
+	go run cmd/migrate/migrate.go status
 
 swagger: ## Générer la documentation Swagger
 	@echo "Génération de la documentation Swagger..."
@@ -102,12 +102,12 @@ quality: ## Lancer tous les outils de qualité de code
 
 fixtures: ## Générer des données de test (10 users, 50 matches, ELO history)
 	@echo "Génération des données de test..."
-	go run cmd/fixtures.go generate
+	go run cmd/fixtures/fixtures.go generate
 
 fixtures-clear: ## Supprimer toutes les données de test
 	@echo "Suppression des données de test..."
-	go run cmd/fixtures.go clear
+	go run cmd/fixtures/fixtures.go clear
 
 fixtures-regenerate: ## Supprimer et régénérer toutes les données de test
 	@echo "Régénération des données de test..."
-	go run cmd/fixtures.go regenerate
+	go run cmd/fixtures/fixtures.go regenerate

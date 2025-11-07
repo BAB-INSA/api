@@ -17,8 +17,8 @@ steps:
       - go mod tidy
       - go test ./config/... ./migrations/... ./fixtures/... .
       - go build -o bab-insa-api main.go
-      - go build -o migrate-binary cmd/migrate.go
-      - go build -o fixtures-binary cmd/fixtures.go
+      - go build -o migrate-binary cmd/migrate/migrate.go
+      - go build -o fixtures-binary cmd/fixtures/fixtures.go
     depends_on:
       - quality
 
