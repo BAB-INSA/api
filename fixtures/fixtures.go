@@ -66,6 +66,9 @@ func (f *Fixtures) generateUsers() ([]authModels.User, error) {
 
 		email := fmt.Sprintf("%s@bab-insa.fr", username)
 		slug := strings.ToLower(username)
+		if i < 0 || i >= len(usernames) {
+			return nil, fmt.Errorf("invalid user index: %d", i)
+		}
 		userID := uint(i + 1) // Force IDs 1, 2, 3, ...
 
 		user := authModels.User{
@@ -162,23 +165,6 @@ func (f *Fixtures) generateMatches(users []authModels.User) ([]models.Match, err
 
 	log.Printf("Created %d matches", len(matches))
 	return matches, nil
-}
-
-func (f *Fixtures) updatePlayerStats(player1ID, player2ID, winnerID uint) {
-	// Update total matches
-	f.db.Model(&models.Player{}).Where("id IN ?", []uint{player1ID, player2ID}).
-		Update("total_matches", gorm.Expr("total_matches + 1"))
-
-	// Update wins/losses
-	f.db.Model(&models.Player{}).Where("id = ?", winnerID).
-		Update("wins", gorm.Expr("wins + 1"))
-
-	loserID := player1ID
-	if winnerID == player1ID {
-		loserID = player2ID
-	}
-	f.db.Model(&models.Player{}).Where("id = ?", loserID).
-		Update("losses", gorm.Expr("losses + 1"))
 }
 
 func (f *Fixtures) generateEloHistoryAndStreaks(users []authModels.User, matches []models.Match) error {

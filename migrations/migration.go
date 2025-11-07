@@ -28,7 +28,9 @@ type Migrator struct {
 }
 
 func NewMigrator(db *gorm.DB) *Migrator {
-	db.AutoMigrate(&Migration{})
+	if err := db.AutoMigrate(&Migration{}); err != nil {
+		panic("Failed to migrate migration table: " + err.Error())
+	}
 	return &Migrator{
 		db:         db,
 		migrations: []MigrationDefinition{},
