@@ -9,14 +9,16 @@ import (
 )
 
 type AutoValidationService struct {
-	db           *gorm.DB
-	matchService *MatchService
+	db               *gorm.DB
+	matchService     *MatchService
+	teamMatchService *TeamMatchService
 }
 
-func NewAutoValidationService(db *gorm.DB, matchService *MatchService) *AutoValidationService {
+func NewAutoValidationService(db *gorm.DB, matchService *MatchService, teamMatchService *TeamMatchService) *AutoValidationService {
 	return &AutoValidationService{
-		db:           db,
-		matchService: matchService,
+		db:               db,
+		matchService:     matchService,
+		teamMatchService: teamMatchService,
 	}
 }
 
@@ -25,7 +27,7 @@ func (s *AutoValidationService) ValidateExpiredMatches() error {
 	// Calculate the cutoff time (24 hours ago)
 	cutoffTime := time.Now().Add(-24 * time.Hour)
 
-	// Find all pending matches older than 24 hours
+	// Find all pending solo matches older than 24 hours
 	var expiredMatches []models.Match
 	result := s.db.Where("status = ? AND created_at < ?", "pending", cutoffTime).Find(&expiredMatches)
 
@@ -34,52 +36,90 @@ func (s *AutoValidationService) ValidateExpiredMatches() error {
 		return result.Error
 	}
 
-	if len(expiredMatches) == 0 {
+	// Find all pending team matches older than 24 hours
+	var expiredTeamMatches []models.TeamMatch
+	teamResult := s.db.Where("status = ? AND created_at < ?", "pending", cutoffTime).Find(&expiredTeamMatches)
+
+	if teamResult.Error != nil {
+		log.Printf("Error finding expired team matches: %v", teamResult.Error)
+		return teamResult.Error
+	}
+
+	totalExpired := len(expiredMatches) + len(expiredTeamMatches)
+	if totalExpired == 0 {
 		log.Println("No expired matches found")
 		return nil
 	}
 
-	log.Printf("Found %d expired matches to validate", len(expiredMatches))
+	log.Printf("Found %d expired matches to validate (%d solo, %d team)", totalExpired, len(expiredMatches), len(expiredTeamMatches))
 
-	// Confirm each expired match
+	// Confirm each expired solo match
 	for _, match := range expiredMatches {
-		log.Printf("Auto-confirming match ID %d (created at %v)", match.ID, match.CreatedAt)
+		log.Printf("Auto-confirming solo match ID %d (created at %v)", match.ID, match.CreatedAt)
 
 		_, err := s.matchService.ConfirmMatch(match.ID)
 		if err != nil {
-			log.Printf("Error auto-confirming match ID %d: %v", match.ID, err)
+			log.Printf("Error auto-confirming solo match ID %d: %v", match.ID, err)
 			// Continue with other matches even if one fails
 			continue
 		}
 
-		log.Printf("Successfully auto-confirmed match ID %d", match.ID)
+		log.Printf("Successfully auto-confirmed solo match ID %d", match.ID)
+	}
+
+	// Confirm each expired team match
+	for _, teamMatch := range expiredTeamMatches {
+		log.Printf("Auto-confirming team match ID %d (created at %v)", teamMatch.ID, teamMatch.CreatedAt)
+
+		_, err := s.teamMatchService.ConfirmTeamMatch(teamMatch.ID)
+		if err != nil {
+			log.Printf("Error auto-confirming team match ID %d: %v", teamMatch.ID, err)
+			// Continue with other matches even if one fails
+			continue
+		}
+
+		log.Printf("Successfully auto-confirmed team match ID %d", teamMatch.ID)
 	}
 
 	return nil
 }
 
-// GetPendingMatchesCount returns the number of pending matches
+// GetPendingMatchesCount returns the number of pending matches (solo + team)
 func (s *AutoValidationService) GetPendingMatchesCount() (int64, error) {
-	var count int64
-	result := s.db.Model(&models.Match{}).Where("status = ?", "pending").Count(&count)
+	var soloCount int64
+	result := s.db.Model(&models.Match{}).Where("status = ?", "pending").Count(&soloCount)
 
 	if result.Error != nil {
 		return 0, result.Error
 	}
 
-	return count, nil
+	var teamCount int64
+	teamResult := s.db.Model(&models.TeamMatch{}).Where("status = ?", "pending").Count(&teamCount)
+
+	if teamResult.Error != nil {
+		return 0, teamResult.Error
+	}
+
+	return soloCount + teamCount, nil
 }
 
-// GetExpiredMatchesCount returns the number of pending matches older than 24 hours
+// GetExpiredMatchesCount returns the number of pending matches older than 24 hours (solo + team)
 func (s *AutoValidationService) GetExpiredMatchesCount() (int64, error) {
 	cutoffTime := time.Now().Add(-24 * time.Hour)
 
-	var count int64
-	result := s.db.Model(&models.Match{}).Where("status = ? AND created_at < ?", "pending", cutoffTime).Count(&count)
+	var soloCount int64
+	result := s.db.Model(&models.Match{}).Where("status = ? AND created_at < ?", "pending", cutoffTime).Count(&soloCount)
 
 	if result.Error != nil {
 		return 0, result.Error
 	}
 
-	return count, nil
+	var teamCount int64
+	teamResult := s.db.Model(&models.TeamMatch{}).Where("status = ? AND created_at < ?", "pending", cutoffTime).Count(&teamCount)
+
+	if teamResult.Error != nil {
+		return 0, teamResult.Error
+	}
+
+	return soloCount + teamCount, nil
 }

@@ -65,6 +65,31 @@ definitions:
     - player2_id
     - winner_id
     type: object
+  models.CreateTeamMatchRequest:
+    properties:
+      team1_id:
+        type: integer
+      team2_id:
+        type: integer
+      winner_team_id:
+        type: integer
+    required:
+    - team1_id
+    - team2_id
+    - winner_team_id
+    type: object
+  models.CreateTeamRequest:
+    properties:
+      name:
+        type: string
+      player1_id:
+        type: integer
+      player2_id:
+        type: integer
+    required:
+    - player1_id
+    - player2_id
+    type: object
   models.EloHistory:
     properties:
       created_at:
@@ -81,9 +106,16 @@ definitions:
         $ref: '#/definitions/models.Match'
       match_id:
         type: integer
+      match_type:
+        description: solo or team
+        type: string
       opponent:
         $ref: '#/definitions/models.Player'
       opponent_id:
+        type: integer
+      opponent_team:
+        $ref: '#/definitions/models.Team'
+      opponent_team_id:
         type: integer
       player:
         allOf:
@@ -162,6 +194,36 @@ definitions:
       totalPages:
         type: integer
     type: object
+  models.PaginatedTeamMatchResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.TeamMatch'
+        type: array
+      page:
+        type: integer
+      pageSize:
+        type: integer
+      total:
+        type: integer
+      totalPages:
+        type: integer
+    type: object
+  models.PaginatedTeamsResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.Team'
+        type: array
+      page:
+        type: integer
+      pageSize:
+        type: integer
+      total:
+        type: integer
+      totalPages:
+        type: integer
+    type: object
   models.PasswordResetConfirmRequest:
     properties:
       newPassword:
@@ -227,6 +289,19 @@ definitions:
         items:
           $ref: '#/definitions/models.Match'
         type: array
+      rank:
+        type: integer
+      team_elo_rating:
+        description: Team-specific ELO fields
+        type: number
+      team_losses:
+        type: integer
+      team_rank:
+        type: integer
+      team_total_matches:
+        type: integer
+      team_wins:
+        type: integer
       total_matches:
         type: integer
       updated_at:
@@ -267,9 +342,88 @@ definitions:
         type: integer
       matches_previous_7_days:
         type: integer
+      team_matches_last_7_days:
+        type: integer
+      team_matches_previous_7_days:
+        type: integer
       total_matches:
         type: integer
       total_players:
+        type: integer
+      total_team_matches:
+        type: integer
+      total_teams:
+        type: integer
+    type: object
+  models.Team:
+    properties:
+      created_at:
+        type: string
+      elo_rating:
+        type: number
+      id:
+        type: integer
+      losses:
+        type: integer
+      name:
+        type: string
+      player1:
+        allOf:
+        - $ref: '#/definitions/models.Player'
+        description: Relationships
+      player1_id:
+        type: integer
+      player2:
+        $ref: '#/definitions/models.Player'
+      player2_id:
+        type: integer
+      slug:
+        type: string
+      team1_matches:
+        items:
+          $ref: '#/definitions/models.TeamMatch'
+        type: array
+      team2_matches:
+        items:
+          $ref: '#/definitions/models.TeamMatch'
+        type: array
+      total_matches:
+        type: integer
+      updated_at:
+        type: string
+      wins:
+        type: integer
+      won_matches:
+        items:
+          $ref: '#/definitions/models.TeamMatch'
+        type: array
+    type: object
+  models.TeamMatch:
+    properties:
+      confirmed_at:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      status:
+        description: pending, confirmed, rejected, cancelled
+        type: string
+      team1:
+        allOf:
+        - $ref: '#/definitions/models.Team'
+        description: Relationships
+      team1_id:
+        type: integer
+      team2:
+        $ref: '#/definitions/models.Team'
+      team2_id:
+        type: integer
+      updated_at:
+        type: string
+      winner_team:
+        $ref: '#/definitions/models.Team'
+      winner_team_id:
         type: integer
     type: object
   models.TokenResponse:
@@ -294,6 +448,22 @@ definitions:
         type: string
       winner_id:
         type: integer
+    type: object
+  models.UpdateTeamMatchStatusRequest:
+    properties:
+      status:
+        enum:
+        - confirmed
+        - rejected
+        - cancelled
+        type: string
+      winner_team_id:
+        type: integer
+    type: object
+  models.UpdateTeamRequest:
+    properties:
+      name:
+        type: string
     type: object
   models.UpdateUserRequest:
     properties:
@@ -1104,13 +1274,21 @@ paths:
       - players
   /players/{id}/elo-history:
     get:
-      description: Get ELO rating history for a specific player
+      description: Get ELO rating history for a specific player with optional match
+        type filter
       parameters:
       - description: Player ID
         in: path
         name: id
         required: true
         type: integer
+      - description: Filter by match type
+        enum:
+        - solo
+        - team
+        in: query
+        name: match_type
+        type: string
       produces:
       - application/json
       responses:
@@ -1195,6 +1373,45 @@ paths:
       summary: Get matches for a player
       tags:
       - players
+  /players/{id}/teams:
+    get:
+      description: Get all teams for a specific player (no pagination)
+      parameters:
+      - description: Player ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Team'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get teams for a player
+      tags:
+      - players
   /players/top:
     get:
       description: Get top N players ordered by ELO rating (highest first), with option
@@ -1233,6 +1450,44 @@ paths:
       summary: Get top players by ELO rating
       tags:
       - players
+  /players/top-teams:
+    get:
+      description: Get top N players ordered by team ELO rating (highest first), with
+        option to include current user
+      parameters:
+      - description: 'Number of players to retrieve (default: 10, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Include current user in results even if not in top (default:
+          false)'
+        in: query
+        name: includeCurrentUser
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Player'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get top players by team ELO rating
+      tags:
+      - players
   /protected/test:
     get:
       description: Test endpoint that requires JWT authentication
@@ -1256,7 +1511,8 @@ paths:
       - protected
   /stats:
     get:
-      description: Get general statistics including total number of players and matches
+      description: Get general statistics including players, solo matches, teams,
+        team matches, and recent activity counts
       produces:
       - application/json
       responses:
@@ -1273,6 +1529,633 @@ paths:
       summary: Get general statistics
       tags:
       - stats
+  /team-matches:
+    get:
+      description: Get team matches with optional filters for team, player, status,
+        and date range
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10, max: 100)'
+        in: query
+        name: per_page
+        type: integer
+      - description: Filter by team ID
+        in: query
+        name: team_id
+        type: integer
+      - description: Filter by player ID
+        in: query
+        name: player_id
+        type: integer
+      - description: Filter by status
+        enum:
+        - pending
+        - confirmed
+        - rejected
+        - cancelled
+        in: query
+        name: status
+        type: string
+      - description: Filter from date (YYYY-MM-DD format)
+        in: query
+        name: date_from
+        type: string
+      - description: Filter to date (YYYY-MM-DD format)
+        in: query
+        name: date_to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.PaginatedTeamMatchResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get team matches
+      tags:
+      - team-matches
+    post:
+      consumes:
+      - application/json
+      description: Create a new match between two teams
+      parameters:
+      - description: Team match data
+        in: body
+        name: match
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateTeamMatchRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.TeamMatch'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a new team match
+      tags:
+      - team-matches
+  /team-matches/{id}:
+    patch:
+      consumes:
+      - application/json
+      description: Update the status and/or winner of a pending team match
+      parameters:
+      - description: Team Match ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Status update data
+        in: body
+        name: update
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateTeamMatchStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.TeamMatch'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update team match status
+      tags:
+      - team-matches
+  /team-matches/{id}/cancel:
+    patch:
+      description: Cancel a team match (admin only)
+      parameters:
+      - description: Team Match ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.TeamMatch'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Cancel team match
+      tags:
+      - team-matches
+  /team-matches/{id}/confirm:
+    patch:
+      description: Confirm a pending team match
+      parameters:
+      - description: Team Match ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.TeamMatch'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Confirm team match
+      tags:
+      - team-matches
+  /team-matches/{id}/reject:
+    patch:
+      description: Reject a pending team match
+      parameters:
+      - description: Team Match ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.TeamMatch'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Reject team match
+      tags:
+      - team-matches
+  /team-matches/recent:
+    get:
+      description: Get the N most recent team matches ordered by creation date (newest
+        first)
+      parameters:
+      - description: 'Number of matches to retrieve (default: 10, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/models.TeamMatch'
+              type: array
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get recent team matches
+      tags:
+      - team-matches
+  /teams:
+    get:
+      description: Get all teams with pagination
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10, max: 100)'
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.PaginatedTeamsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get all teams
+      tags:
+      - teams
+    post:
+      consumes:
+      - application/json
+      description: Create a new team with two players
+      parameters:
+      - description: Team data
+        in: body
+        name: team
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateTeamRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Team'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a new team
+      tags:
+      - teams
+  /teams/{id}:
+    delete:
+      description: Delete a team (admin only)
+      parameters:
+      - description: Team ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete team
+      tags:
+      - teams
+    get:
+      description: Get team information by team ID
+      parameters:
+      - description: Team ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Team'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get team by ID
+      tags:
+      - teams
+    put:
+      consumes:
+      - application/json
+      description: Update team name
+      parameters:
+      - description: Team ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Team update data
+        in: body
+        name: team
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateTeamRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Team'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update team
+      tags:
+      - teams
+  /teams/get-or-create:
+    post:
+      consumes:
+      - application/json
+      description: Find existing team or create new one with two players
+      parameters:
+      - description: Team data
+        in: body
+        name: team
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateTeamRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Team'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get or create team
+      tags:
+      - teams
+  /teams/players/{playerId}:
+    get:
+      description: Get all teams that include a specific player
+      parameters:
+      - description: Player ID
+        in: path
+        name: playerId
+        required: true
+        type: integer
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10, max: 100)'
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.PaginatedTeamsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get teams by player
+      tags:
+      - teams
   /users:
     get:
       description: Get paginated list of users with optional search
