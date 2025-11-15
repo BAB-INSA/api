@@ -49,13 +49,20 @@ func (s *PlayerService) CreatePlayer(userID uint, username string) (*models.Play
 	return player, nil
 }
 
-func (s *PlayerService) GetEloHistoryByPlayerID(playerID uint) ([]models.EloHistory, error) {
+func (s *PlayerService) GetEloHistoryByPlayerID(playerID uint, matchType string) ([]models.EloHistory, error) {
 	var eloHistory []models.EloHistory
 
-	result := s.db.Where("player_id = ?", playerID).
-		Order("id ASC").
+	query := s.db.Where("player_id = ?", playerID)
+
+	// Filter by match type if specified
+	if matchType != "" {
+		query = query.Where("match_type = ?", matchType)
+	}
+
+	result := query.Order("id ASC").
 		Preload("Match").
 		Preload("Opponent").
+		Preload("OpponentTeam").
 		Find(&eloHistory)
 
 	if result.Error != nil {
@@ -69,6 +76,40 @@ func (s *PlayerService) GetTopPlayersByElo(limit int, currentUserID *uint) ([]mo
 	var players []models.Player
 
 	result := s.db.Order("elo_rating DESC").
+		Limit(limit).
+		Find(&players)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	// Si currentUserID est fourni et que l'utilisateur n'est pas dans le top, l'ajouter
+	if currentUserID != nil {
+		// Vérifier si l'utilisateur connecté est déjà dans la liste
+		userInTop := false
+		for _, player := range players {
+			if player.ID == *currentUserID {
+				userInTop = true
+				break
+			}
+		}
+
+		// Si l'utilisateur n'est pas dans le top, le récupérer et l'ajouter
+		if !userInTop {
+			var currentUser models.Player
+			if err := s.db.First(&currentUser, *currentUserID).Error; err == nil {
+				players = append(players, currentUser)
+			}
+		}
+	}
+
+	return players, nil
+}
+
+func (s *PlayerService) GetTopPlayersByTeamElo(limit int, currentUserID *uint) ([]models.Player, error) {
+	var players []models.Player
+
+	result := s.db.Order("team_elo_rating DESC").
 		Limit(limit).
 		Find(&players)
 

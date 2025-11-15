@@ -45,8 +45,32 @@ func (f *Fixtures) GenerateTestData() error {
 		return fmt.Errorf("failed to generate ELO history and streaks: %w", err)
 	}
 
+	// Generate teams
+	teams, err := f.generateTeams(users)
+	if err != nil {
+		return fmt.Errorf("failed to generate teams: %w", err)
+	}
+
+	// Generate team matches
+	teamMatches, err := f.generateTeamMatches(teams)
+	if err != nil {
+		return fmt.Errorf("failed to generate team matches: %w", err)
+	}
+
+	// Generate team ELO history
+	err = f.generateTeamEloHistory(teams, teamMatches)
+	if err != nil {
+		return fmt.Errorf("failed to generate team ELO history: %w", err)
+	}
+
+	// Recalculate all ranks after ELO updates
+	err = f.recalculateAllRanks()
+	if err != nil {
+		return fmt.Errorf("failed to recalculate ranks: %w", err)
+	}
+
 	log.Println("Fixtures generated successfully!")
-	log.Printf("Created %d users, %d matches, and ELO history", len(users), len(matches))
+	log.Printf("Created %d users, %d matches, %d teams, %d team matches and ELO history", len(users), len(matches), len(teams), len(teamMatches))
 	return nil
 }
 
@@ -88,13 +112,18 @@ func (f *Fixtures) generateUsers() ([]authModels.User, error) {
 
 		// Create corresponding player with fixed ELO based on index
 		baseElos := []float64{1200, 1250, 1180, 1320, 1150, 1280, 1220, 1350, 1100, 1300}
+		teamBaseElos := []float64{1180, 1280, 1200, 1300, 1160, 1260, 1240, 1380, 1120, 1320}
 		player := models.Player{
-			ID:           userID, // Same ID as user
-			Username:     user.Username,
-			EloRating:    baseElos[i],
-			TotalMatches: 0, // Will be updated when matches are created
-			Wins:         0,
-			Losses:       0,
+			ID:               userID, // Same ID as user
+			Username:         user.Username,
+			EloRating:        baseElos[i],
+			TeamEloRating:    teamBaseElos[i],
+			TotalMatches:     0, // Will be updated when matches are created
+			Wins:             0,
+			Losses:           0,
+			TeamTotalMatches: 0,
+			TeamWins:         0,
+			TeamLosses:       0,
 		}
 
 		if err := f.db.Create(&player).Error; err != nil {
@@ -293,6 +322,8 @@ func (f *Fixtures) ClearAllData() error {
 	// Delete in correct order due to foreign key constraints
 	tables := []interface{}{
 		&models.EloHistory{},
+		&models.TeamMatch{},
+		&models.Team{},
 		&models.Match{},
 		&models.Player{},
 		&authModels.RefreshToken{},
@@ -309,6 +340,8 @@ func (f *Fixtures) ClearAllData() error {
 	sequences := []string{
 		"ALTER SEQUENCE users_id_seq RESTART WITH 1",
 		"ALTER SEQUENCE matches_id_seq RESTART WITH 1",
+		"ALTER SEQUENCE teams_id_seq RESTART WITH 1",
+		"ALTER SEQUENCE team_matches_id_seq RESTART WITH 1",
 		"ALTER SEQUENCE elo_history_id_seq RESTART WITH 1",
 		"ALTER SEQUENCE refresh_tokens_id_seq RESTART WITH 1",
 	}
@@ -318,5 +351,389 @@ func (f *Fixtures) ClearAllData() error {
 	}
 
 	log.Println("All fixture data cleared!")
+	return nil
+}
+
+// generateTeams creates teams from existing users
+func (f *Fixtures) generateTeams(users []authModels.User) ([]models.Team, error) {
+	var teams []models.Team
+
+	// Create 8 different teams with various combinations
+	teamCombinations := []struct {
+		player1Index int
+		player2Index int
+		name         string
+	}{
+		{0, 1, "Alex & Marie"},
+		{2, 3, "Jul & Sophie"},
+		{4, 5, "Tom & Cam"},
+		{6, 7, "Nico & Laura"},
+		{8, 9, "Antoine & Emma"},
+		{0, 4, "Alex & Tom"},
+		{1, 6, "Marie & Nico"},
+		{3, 7, "Sophie & Laura"},
+	}
+
+	for _, combo := range teamCombinations {
+		if combo.player1Index >= len(users) || combo.player2Index >= len(users) {
+			continue
+		}
+
+		// Generate slug from name
+		slug := strings.ToLower(strings.ReplaceAll(combo.name, " & ", "-"))
+		slug = strings.ReplaceAll(slug, " ", "-")
+
+		team := models.Team{
+			Player1ID:    users[combo.player1Index].ID,
+			Player2ID:    users[combo.player2Index].ID,
+			Name:         combo.name,
+			Slug:         slug,
+			EloRating:    1200,
+			TotalMatches: 0,
+			Wins:         0,
+			Losses:       0,
+		}
+
+		if err := f.db.Create(&team).Error; err != nil {
+			return nil, err
+		}
+
+		teams = append(teams, team)
+		log.Printf("Created team: %s (ID: %d)", combo.name, team.ID)
+	}
+
+	log.Printf("Created %d teams", len(teams))
+	return teams, nil
+}
+
+// generateTeamMatches creates team matches
+func (f *Fixtures) generateTeamMatches(teams []models.Team) ([]models.TeamMatch, error) {
+	var teamMatches []models.TeamMatch
+
+	// Generate 20 team matches over the last 30 days
+	now := time.Now()
+
+	for i := 0; i < 20; i++ {
+		// Random date in the last 30 days
+		daysAgo := rand.Intn(30)
+		matchDate := now.AddDate(0, 0, -daysAgo).Add(time.Duration(rand.Intn(24)) * time.Hour)
+
+		// Pick two random different teams
+		team1 := teams[rand.Intn(len(teams))]
+		var team2 models.Team
+		for {
+			team2 = teams[rand.Intn(len(teams))]
+			if team2.ID != team1.ID {
+				break
+			}
+		}
+
+		// Check for overlapping players
+		if team1.Player1ID == team2.Player1ID || team1.Player1ID == team2.Player2ID ||
+			team1.Player2ID == team2.Player1ID || team1.Player2ID == team2.Player2ID {
+			// Skip if teams share players
+			continue
+		}
+
+		// Random winner
+		var winnerTeamID uint
+		if rand.Float32() < 0.5 {
+			winnerTeamID = team1.ID
+		} else {
+			winnerTeamID = team2.ID
+		}
+
+		// Random status (most confirmed)
+		status := "confirmed"
+		confirmedAt := &matchDate
+		if rand.Float32() < 0.1 { // 10% pending
+			status = "pending"
+			confirmedAt = nil
+		}
+
+		teamMatch := models.TeamMatch{
+			Team1ID:      team1.ID,
+			Team2ID:      team2.ID,
+			WinnerTeamID: winnerTeamID,
+			Status:       status,
+			CreatedAt:    matchDate,
+			ConfirmedAt:  confirmedAt,
+		}
+
+		if err := f.db.Create(&teamMatch).Error; err != nil {
+			return nil, err
+		}
+
+		teamMatches = append(teamMatches, teamMatch)
+	}
+
+	log.Printf("Created %d team matches", len(teamMatches))
+	return teamMatches, nil
+}
+
+// generateTeamEloHistory creates team ELO history and updates team stats
+func (f *Fixtures) generateTeamEloHistory(teams []models.Team, teamMatches []models.TeamMatch) error {
+	// Track current team ELO for each player
+	playerTeamElos := make(map[uint]float64)
+	playerTeamTotalMatches := make(map[uint]int)
+	playerTeamWins := make(map[uint]int)
+	playerTeamLosses := make(map[uint]int)
+
+	// Initialize with player's base team ELO
+	var players []models.Player
+	f.db.Find(&players)
+	for _, player := range players {
+		playerTeamElos[player.ID] = player.TeamEloRating
+		playerTeamTotalMatches[player.ID] = 0
+		playerTeamWins[player.ID] = 0
+		playerTeamLosses[player.ID] = 0
+	}
+
+	// Sort team matches by creation date to process chronologically
+	var sortedTeamMatches []models.TeamMatch
+	f.db.Preload("Team1").Preload("Team2").Order("created_at ASC").Find(&sortedTeamMatches)
+
+	for _, teamMatch := range sortedTeamMatches {
+		if teamMatch.Status != "confirmed" {
+			continue
+		}
+
+		// Get team players
+		var team1, team2 models.Team
+		f.db.First(&team1, teamMatch.Team1ID)
+		f.db.First(&team2, teamMatch.Team2ID)
+
+		// Calculate team averages
+		team1AvgElo := coreUtils.CalculateTeamAverageElo(
+			playerTeamElos[team1.Player1ID],
+			playerTeamElos[team1.Player2ID],
+		)
+		team2AvgElo := coreUtils.CalculateTeamAverageElo(
+			playerTeamElos[team2.Player1ID],
+			playerTeamElos[team2.Player2ID],
+		)
+
+		isTeam1Winner := teamMatch.WinnerTeamID == teamMatch.Team1ID
+
+		// Calculate ELO changes for each player
+		team1Player1Change := coreUtils.CalculateTeamEloChange(playerTeamElos[team1.Player1ID], team2AvgElo, isTeam1Winner)
+		team1Player2Change := coreUtils.CalculateTeamEloChange(playerTeamElos[team1.Player2ID], team2AvgElo, isTeam1Winner)
+		team2Player1Change := coreUtils.CalculateTeamEloChange(playerTeamElos[team2.Player1ID], team1AvgElo, !isTeam1Winner)
+		team2Player2Change := coreUtils.CalculateTeamEloChange(playerTeamElos[team2.Player2ID], team1AvgElo, !isTeam1Winner)
+
+		// Create ELO history entries for team match
+		eloHistories := []models.EloHistory{
+			{
+				PlayerID:       team1.Player1ID,
+				MatchID:        teamMatch.ID,
+				EloBefore:      playerTeamElos[team1.Player1ID],
+				EloAfter:       playerTeamElos[team1.Player1ID] + team1Player1Change,
+				EloChange:      team1Player1Change,
+				OpponentTeamID: &teamMatch.Team2ID,
+				MatchType:      "team",
+				CreatedAt:      teamMatch.CreatedAt,
+			},
+			{
+				PlayerID:       team1.Player2ID,
+				MatchID:        teamMatch.ID,
+				EloBefore:      playerTeamElos[team1.Player2ID],
+				EloAfter:       playerTeamElos[team1.Player2ID] + team1Player2Change,
+				EloChange:      team1Player2Change,
+				OpponentTeamID: &teamMatch.Team2ID,
+				MatchType:      "team",
+				CreatedAt:      teamMatch.CreatedAt,
+			},
+			{
+				PlayerID:       team2.Player1ID,
+				MatchID:        teamMatch.ID,
+				EloBefore:      playerTeamElos[team2.Player1ID],
+				EloAfter:       playerTeamElos[team2.Player1ID] + team2Player1Change,
+				EloChange:      team2Player1Change,
+				OpponentTeamID: &teamMatch.Team1ID,
+				MatchType:      "team",
+				CreatedAt:      teamMatch.CreatedAt,
+			},
+			{
+				PlayerID:       team2.Player2ID,
+				MatchID:        teamMatch.ID,
+				EloBefore:      playerTeamElos[team2.Player2ID],
+				EloAfter:       playerTeamElos[team2.Player2ID] + team2Player2Change,
+				EloChange:      team2Player2Change,
+				OpponentTeamID: &teamMatch.Team1ID,
+				MatchType:      "team",
+				CreatedAt:      teamMatch.CreatedAt,
+			},
+		}
+
+		// Save all ELO history entries
+		for _, eloHistory := range eloHistories {
+			if err := f.db.Create(&eloHistory).Error; err != nil {
+				return err
+			}
+		}
+
+		// Update player team ELOs for next calculation
+		playerTeamElos[team1.Player1ID] += team1Player1Change
+		playerTeamElos[team1.Player2ID] += team1Player2Change
+		playerTeamElos[team2.Player1ID] += team2Player1Change
+		playerTeamElos[team2.Player2ID] += team2Player2Change
+
+		// Update team match stats
+		playerTeamTotalMatches[team1.Player1ID]++
+		playerTeamTotalMatches[team1.Player2ID]++
+		playerTeamTotalMatches[team2.Player1ID]++
+		playerTeamTotalMatches[team2.Player2ID]++
+
+		// Update wins/losses
+		if isTeam1Winner {
+			playerTeamWins[team1.Player1ID]++
+			playerTeamWins[team1.Player2ID]++
+			playerTeamLosses[team2.Player1ID]++
+			playerTeamLosses[team2.Player2ID]++
+		} else {
+			playerTeamWins[team2.Player1ID]++
+			playerTeamWins[team2.Player2ID]++
+			playerTeamLosses[team1.Player1ID]++
+			playerTeamLosses[team1.Player2ID]++
+		}
+	}
+
+	// Update team statistics as well
+	teamStats := make(map[uint]map[string]interface{})
+	for _, teamMatch := range sortedTeamMatches {
+		if teamMatch.Status != "confirmed" {
+			continue
+		}
+
+		// Initialize team stats if not exists
+		if _, exists := teamStats[teamMatch.Team1ID]; !exists {
+			teamStats[teamMatch.Team1ID] = map[string]interface{}{
+				"total_matches": 0,
+				"wins":          0,
+				"losses":        0,
+				"elo_rating":    1200.0,
+			}
+		}
+		if _, exists := teamStats[teamMatch.Team2ID]; !exists {
+			teamStats[teamMatch.Team2ID] = map[string]interface{}{
+				"total_matches": 0,
+				"wins":          0,
+				"losses":        0,
+				"elo_rating":    1200.0,
+			}
+		}
+
+		// Update match counts
+		teamStats[teamMatch.Team1ID]["total_matches"] = teamStats[teamMatch.Team1ID]["total_matches"].(int) + 1
+		teamStats[teamMatch.Team2ID]["total_matches"] = teamStats[teamMatch.Team2ID]["total_matches"].(int) + 1
+
+		// Update wins/losses
+		if teamMatch.WinnerTeamID == teamMatch.Team1ID {
+			teamStats[teamMatch.Team1ID]["wins"] = teamStats[teamMatch.Team1ID]["wins"].(int) + 1
+			teamStats[teamMatch.Team2ID]["losses"] = teamStats[teamMatch.Team2ID]["losses"].(int) + 1
+		} else {
+			teamStats[teamMatch.Team2ID]["wins"] = teamStats[teamMatch.Team2ID]["wins"].(int) + 1
+			teamStats[teamMatch.Team1ID]["losses"] = teamStats[teamMatch.Team1ID]["losses"].(int) + 1
+		}
+
+		// Calculate team ELO change (average of players' changes)
+		var team1, team2 models.Team
+		f.db.First(&team1, teamMatch.Team1ID)
+		f.db.First(&team2, teamMatch.Team2ID)
+
+		team1AvgElo := coreUtils.CalculateTeamAverageElo(
+			playerTeamElos[team1.Player1ID],
+			playerTeamElos[team1.Player2ID],
+		)
+		team2AvgElo := coreUtils.CalculateTeamAverageElo(
+			playerTeamElos[team2.Player1ID],
+			playerTeamElos[team2.Player2ID],
+		)
+
+		isTeam1Winner := teamMatch.WinnerTeamID == teamMatch.Team1ID
+
+		team1Player1Change := coreUtils.CalculateTeamEloChange(playerTeamElos[team1.Player1ID], team2AvgElo, isTeam1Winner)
+		team1Player2Change := coreUtils.CalculateTeamEloChange(playerTeamElos[team1.Player2ID], team2AvgElo, isTeam1Winner)
+		team2Player1Change := coreUtils.CalculateTeamEloChange(playerTeamElos[team2.Player1ID], team1AvgElo, !isTeam1Winner)
+		team2Player2Change := coreUtils.CalculateTeamEloChange(playerTeamElos[team2.Player2ID], team1AvgElo, !isTeam1Winner)
+
+		team1EloChange := (team1Player1Change + team1Player2Change) / 2.0
+		team2EloChange := (team2Player1Change + team2Player2Change) / 2.0
+
+		teamStats[teamMatch.Team1ID]["elo_rating"] = teamStats[teamMatch.Team1ID]["elo_rating"].(float64) + team1EloChange
+		teamStats[teamMatch.Team2ID]["elo_rating"] = teamStats[teamMatch.Team2ID]["elo_rating"].(float64) + team2EloChange
+	}
+
+	// Update final team stats in players table
+	for _, player := range players {
+		playerID := player.ID
+		f.db.Model(&models.Player{}).Where("id = ?", playerID).Updates(map[string]interface{}{
+			"team_elo_rating":    playerTeamElos[playerID],
+			"team_total_matches": playerTeamTotalMatches[playerID],
+			"team_wins":          playerTeamWins[playerID],
+			"team_losses":        playerTeamLosses[playerID],
+		})
+	}
+
+	// Update final team statistics
+	for teamID, stats := range teamStats {
+		f.db.Model(&models.Team{}).Where("id = ?", teamID).Updates(stats)
+	}
+
+	log.Println("Generated team ELO history and stats for all team matches")
+	return nil
+}
+
+// recalculateAllRanks calculates both solo and team ranks for all players
+func (f *Fixtures) recalculateAllRanks() error {
+	log.Println("Recalculating all player ranks...")
+
+	// Recalculate solo ranks (based on elo_rating)
+	var playersForSoloRank []models.Player
+	if err := f.db.Order("elo_rating DESC, id ASC").Find(&playersForSoloRank).Error; err != nil {
+		return err
+	}
+
+	currentRank := 1
+	var previousElo float64
+
+	for i, player := range playersForSoloRank {
+		// Si ce n'est pas le premier joueur et que l'ELO est différent du précédent
+		if i > 0 && player.EloRating != previousElo {
+			currentRank = i + 1
+		}
+
+		// Mettre à jour le rang solo du joueur
+		if err := f.db.Model(&player).Update("rank", currentRank).Error; err != nil {
+			return err
+		}
+
+		previousElo = player.EloRating
+	}
+
+	// Recalculate team ranks (based on team_elo_rating)
+	var playersForTeamRank []models.Player
+	if err := f.db.Order("team_elo_rating DESC, id ASC").Find(&playersForTeamRank).Error; err != nil {
+		return err
+	}
+
+	currentTeamRank := 1
+	var previousTeamElo float64
+
+	for i, player := range playersForTeamRank {
+		// Si ce n'est pas le premier joueur et que l'ELO équipe est différent du précédent
+		if i > 0 && player.TeamEloRating != previousTeamElo {
+			currentTeamRank = i + 1
+		}
+
+		// Mettre à jour le rang équipe du joueur
+		if err := f.db.Model(&player).Update("team_rank", currentTeamRank).Error; err != nil {
+			return err
+		}
+
+		previousTeamElo = player.TeamEloRating
+	}
+
+	log.Println("Successfully recalculated solo and team ranks for all players")
 	return nil
 }
