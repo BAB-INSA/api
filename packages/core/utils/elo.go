@@ -27,3 +27,29 @@ func CalculateEloChange(player1Elo, player2Elo float64, winnerID, player1ID uint
 
 	return math.Round(change1), math.Round(change2)
 }
+
+// CalculateTeamEloChange calculates ELO rating changes for team matches
+// Each player's ELO is calculated individually against the average ELO of the opposing team
+func CalculateTeamEloChange(playerElo, opponentTeamAvgElo float64, isWinner bool) float64 {
+	const K = 32.0 // ELO K-factor
+
+	// Expected score for this player against the opposing team's average
+	expectedScore := 1.0 / (1.0 + math.Pow(10, (opponentTeamAvgElo-playerElo)/400))
+
+	// Actual score
+	var actualScore float64
+	if isWinner {
+		actualScore = 1.0
+	} else {
+		actualScore = 0.0
+	}
+
+	// Calculate change
+	change := K * (actualScore - expectedScore)
+	return math.Round(change)
+}
+
+// CalculateTeamAverageElo calculates the average ELO of a team
+func CalculateTeamAverageElo(player1Elo, player2Elo float64) float64 {
+	return (player1Elo + player2Elo) / 2.0
+}

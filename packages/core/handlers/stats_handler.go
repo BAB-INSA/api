@@ -19,7 +19,7 @@ func NewStatsHandler(statsService *services.StatsService) *StatsHandler {
 
 // GetStats retrieves general statistics
 // @Summary Get general statistics
-// @Description Get general statistics including total number of players and matches
+// @Description Get general statistics including players, solo matches, teams, team matches, and recent activity counts
 // @Tags stats
 // @Produce json
 // @Success 200 {object} models.Stats

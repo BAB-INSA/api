@@ -11,11 +11,13 @@ import (
 
 type PlayerHandler struct {
 	playerService *services.PlayerService
+	teamService   *services.TeamService
 }
 
-func NewPlayerHandler(playerService *services.PlayerService) *PlayerHandler {
+func NewPlayerHandler(playerService *services.PlayerService, teamService *services.TeamService) *PlayerHandler {
 	return &PlayerHandler{
 		playerService: playerService,
+		teamService:   teamService,
 	}
 }
 
@@ -59,10 +61,11 @@ func (h *PlayerHandler) GetPlayer(c *gin.Context) {
 
 // GetEloHistory retrieves ELO history for a player
 // @Summary Get player ELO history
-// @Description Get ELO rating history for a specific player
+// @Description Get ELO rating history for a specific player with optional match type filter
 // @Tags players
 // @Produce json
 // @Param id path int true "Player ID"
+// @Param match_type query string false "Filter by match type" Enums(solo, team)
 // @Success 200 {array} models.EloHistory
 // @Failure 400 {object} map[string]string
 // @Failure 404 {object} map[string]string
@@ -74,6 +77,15 @@ func (h *PlayerHandler) GetEloHistory(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Invalid player ID",
+		})
+		return
+	}
+
+	// Get match_type filter
+	matchType := c.Query("match_type")
+	if matchType != "" && matchType != "solo" && matchType != "team" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid match_type. Must be 'solo' or 'team'",
 		})
 		return
 	}
@@ -93,8 +105,8 @@ func (h *PlayerHandler) GetEloHistory(c *gin.Context) {
 		return
 	}
 
-	// Get ELO history
-	eloHistory, err := h.playerService.GetEloHistoryByPlayerID(uint(id))
+	// Get ELO history with filter
+	eloHistory, err := h.playerService.GetEloHistoryByPlayerID(uint(id), matchType)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to retrieve ELO history",
@@ -150,6 +162,61 @@ func (h *PlayerHandler) GetTopPlayers(c *gin.Context) {
 	}
 
 	players, err := h.playerService.GetTopPlayersByElo(limit, currentUserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to retrieve top players",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, players)
+}
+
+// GetTopPlayersByTeamElo gets top players by team ELO rating
+// @Summary Get top players by team ELO rating
+// @Description Get top N players ordered by team ELO rating (highest first), with option to include current user
+// @Tags players
+// @Produce json
+// @Param limit query int false "Number of players to retrieve (default: 10, max: 100)"
+// @Param includeCurrentUser query bool false "Include current user in results even if not in top (default: false)"
+// @Success 200 {array} models.Player
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /players/top-teams [get]
+func (h *PlayerHandler) GetTopPlayersByTeamElo(c *gin.Context) {
+	limitStr := c.DefaultQuery("limit", "10")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid limit parameter",
+		})
+		return
+	}
+
+	// Cap the limit to prevent excessive queries
+	if limit > 100 {
+		limit = 100
+	}
+
+	// Vérifier si on doit inclure l'utilisateur connecté
+	includeCurrentUserStr := c.DefaultQuery("includeCurrentUser", "false")
+	includeCurrentUser, err := strconv.ParseBool(includeCurrentUserStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid includeCurrentUser parameter",
+		})
+		return
+	}
+
+	var currentUserID *uint
+	if includeCurrentUser {
+		// Récupérer l'ID de l'utilisateur connecté depuis le contexte JWT
+		if userID, exists := authMiddleware.GetUserID(c); exists {
+			currentUserID = &userID
+		}
+	}
+
+	players, err := h.playerService.GetTopPlayersByTeamElo(limit, currentUserID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to retrieve top players",
@@ -308,4 +375,52 @@ func (h *PlayerHandler) GetAllPlayers(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, paginatedResponse)
+}
+
+// GetPlayerTeams retrieves all teams for a specific player
+// @Summary Get teams for a player
+// @Description Get all teams for a specific player (no pagination)
+// @Tags players
+// @Produce json
+// @Param id path int true "Player ID"
+// @Success 200 {array} models.Team
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /players/{id}/teams [get]
+func (h *PlayerHandler) GetPlayerTeams(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid player ID",
+		})
+		return
+	}
+
+	// Check if player exists
+	_, err = h.playerService.GetPlayerByID(uint(id))
+	if err != nil {
+		if err.Error() == "player not found" {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "Player not found",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Internal server error",
+		})
+		return
+	}
+
+	// Get all teams for the player
+	teams, err := h.teamService.GetAllTeamsByPlayer(uint(id))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to retrieve player teams",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, teams)
 }
