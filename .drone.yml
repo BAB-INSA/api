@@ -66,7 +66,7 @@ steps:
       - ssh-add ~/.ssh/id_ed25519
       - rsync -av --quiet --exclude='.env' -e "ssh -p $PRODUCTION_SSH_PORT" bab-insa-api migrate-binary $PRODUCTION_SSH_USER@$PRODUCTION_SSH_HOST:$PRODUCTION_PATH/
       - ssh -p $PRODUCTION_SSH_PORT $PRODUCTION_SSH_USER@$PRODUCTION_SSH_HOST "chmod +x $PRODUCTION_PATH/bab-insa-api $PRODUCTION_PATH/migrate-binary"
-      - ssh -p $STAGING_SSH_PORT $PRODUCTION_SSH_USER@$PRODUCTION_SSH_HOST "pkill -f bab-insa-api || true && cd $PRODUCTION_PATH && nohup ./bab-insa-api > /dev/null 2>&1 & echo 'Service restarted'"
+      - ssh -p $PRODUCTION_SSH_PORT $PRODUCTION_SSH_USER@$PRODUCTION_SSH_HOST "pkill -f bab-insa-api || true && cd $PRODUCTION_PATH && nohup ./bab-insa-api > /dev/null 2>&1 & echo 'Service restarted'"
     environment:
       SSH_PRIVATE_KEY:
         from_secret: production_ssh_key
