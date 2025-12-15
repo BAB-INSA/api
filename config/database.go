@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
+	"time"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -50,6 +52,46 @@ func ConnectDatabase() {
 		log.Fatal("Failed to connect to database:", err)
 	}
 
-	log.Println("Database connected successfully")
+	sqlDB, err := database.DB()
+	if err != nil {
+		log.Fatal("Failed to get database instance:", err)
+	}
+
+	maxOpenConns := getEnvAsInt("DB_MAX_OPEN_CONNS", 10)
+	maxIdleConns := getEnvAsInt("DB_MAX_IDLE_CONNS", 5)
+	maxLifetime := getEnvAsInt("DB_CONN_MAX_LIFETIME", 3600)
+
+	sqlDB.SetMaxOpenConns(maxOpenConns)
+	sqlDB.SetMaxIdleConns(maxIdleConns)
+	sqlDB.SetConnMaxLifetime(time.Duration(maxLifetime) * time.Second)
+
+	log.Printf("Database connected successfully with pool: max_open=%d, max_idle=%d, max_lifetime=%ds",
+		maxOpenConns, maxIdleConns, maxLifetime)
 	DB = database
+}
+
+func getEnvAsInt(name string, defaultValue int) int {
+	valueStr := os.Getenv(name)
+	if valueStr == "" {
+		return defaultValue
+	}
+	value, err := strconv.Atoi(valueStr)
+	if err != nil {
+		log.Printf("Invalid value for %s: %s, using default: %d", name, valueStr, defaultValue)
+		return defaultValue
+	}
+	return value
+}
+
+func CloseDatabase() {
+	if DB != nil {
+		sqlDB, err := DB.DB()
+		if err != nil {
+			log.Printf("Error getting database instance: %v", err)
+			return
+		}
+		if err := sqlDB.Close(); err != nil {
+			log.Printf("Error closing database: %v", err)
+		}
+	}
 }
