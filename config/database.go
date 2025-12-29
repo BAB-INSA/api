@@ -44,7 +44,7 @@ func ConnectDatabase() {
 		sslmode = "disable"
 	}
 
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s statement_timeout=30000",
 		host, user, password, dbname, port, sslmode)
 
 	database, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
@@ -64,6 +64,7 @@ func ConnectDatabase() {
 	sqlDB.SetMaxOpenConns(maxOpenConns)
 	sqlDB.SetMaxIdleConns(maxIdleConns)
 	sqlDB.SetConnMaxLifetime(time.Duration(maxLifetime) * time.Second)
+	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
 
 	log.Printf("Database connected successfully with pool: max_open=%d, max_idle=%d, max_lifetime=%ds",
 		maxOpenConns, maxIdleConns, maxLifetime)
