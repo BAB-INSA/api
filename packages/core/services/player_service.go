@@ -49,6 +49,23 @@ func (s *PlayerService) CreatePlayer(userID uint, username string) (*models.Play
 	return player, nil
 }
 
+func (s *PlayerService) CreatePlayerWithTx(tx *gorm.DB, userID uint, username string) (*models.Player, error) {
+	player := &models.Player{
+		ID:           userID,
+		Username:     username,
+		EloRating:    1200,
+		TotalMatches: 0,
+		Wins:         0,
+		Losses:       0,
+	}
+
+	if err := tx.Create(player).Error; err != nil {
+		return nil, err
+	}
+
+	return player, nil
+}
+
 func (s *PlayerService) GetEloHistoryByPlayerID(playerID uint, matchType string) ([]models.EloHistory, error) {
 	var eloHistory []models.EloHistory
 

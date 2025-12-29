@@ -33,6 +33,49 @@ func NewAuthHandler(db *gorm.DB, playerService *coreServices.PlayerService) *Aut
 	}
 }
 
+func (h *AuthHandler) CreateUserAndPlayerWithTx(req models.RegisterRequest) (*models.User, error) {
+	var user models.User
+	var err error
+
+	err = h.DB.Transaction(func(tx *gorm.DB) error {
+		hashedPassword, err := utils.HashPassword(req.Password)
+		if err != nil {
+			return err
+		}
+
+		now := time.Now()
+		slug := strings.ToLower(strings.ReplaceAll(req.Username, " ", "-"))
+
+		user = models.User{
+			Email:       req.Email,
+			Username:    req.Username,
+			Slug:        slug,
+			Password:    hashedPassword,
+			Enabled:     true,
+			LastLogin:   &now,
+			NbConnexion: 1,
+			Roles:       models.GetDefaultRoles(),
+		}
+
+		if err := tx.Create(&user).Error; err != nil {
+			return err
+		}
+
+		_, err = h.PlayerService.CreatePlayerWithTx(tx, user.ID, user.Username)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
 // @Summary User Registration
 // @Description Register a new user and get JWT tokens
 // @Tags auth
@@ -61,41 +104,13 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	hashedPassword, err := utils.HashPassword(req.Password)
+	user, err := h.CreateUserAndPlayerWithTx(req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user and player profile"})
 		return
 	}
 
-	now := time.Now()
-	slug := strings.ToLower(strings.ReplaceAll(req.Username, " ", "-"))
-
-	user := models.User{
-		Email:       req.Email,
-		Username:    req.Username,
-		Slug:        slug,
-		Password:    hashedPassword,
-		Enabled:     true,
-		LastLogin:   &now,
-		NbConnexion: 1, // Auto-login compte comme première connexion
-		Roles:       models.GetDefaultRoles(),
-	}
-
-	if err := h.DB.Create(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
-		return
-	}
-
-	// Create corresponding player
-	_, err = h.PlayerService.CreatePlayer(user.ID, user.Username)
-	if err != nil {
-		// If player creation fails, we should rollback the user creation
-		h.DB.Delete(&user)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create player profile"})
-		return
-	}
-
-	tokenPair, err := utils.GenerateTokenPair(h.DB, user)
+	tokenPair, err := utils.GenerateTokenPair(h.DB, *user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
 		return
@@ -106,7 +121,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		"refresh_token": tokenPair.RefreshToken,
 		"expires_in":    tokenPair.ExpiresIn,
 		"token_type":    tokenPair.TokenType,
-		"user":          user,
+		"user":          *user,
 	}
 
 	c.JSON(http.StatusCreated, response)
