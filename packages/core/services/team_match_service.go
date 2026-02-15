@@ -10,16 +10,18 @@ import (
 )
 
 type TeamMatchService struct {
-	db            *gorm.DB
-	teamService   *TeamService
-	playerService *PlayerService
+	db                *gorm.DB
+	teamService       *TeamService
+	playerService     *PlayerService
+	tournamentService *TournamentService
 }
 
 func NewTeamMatchService(db *gorm.DB) *TeamMatchService {
 	return &TeamMatchService{
-		db:            db,
-		teamService:   NewTeamService(db),
-		playerService: NewPlayerService(db),
+		db:                db,
+		teamService:       NewTeamService(db),
+		playerService:     NewPlayerService(db),
+		tournamentService: NewTournamentService(db),
 	}
 }
 
@@ -47,13 +49,14 @@ func (s *TeamMatchService) GetRecentTeamMatches(limit int) ([]models.TeamMatch, 
 }
 
 type TeamMatchFilters struct {
-	TeamID   *uint      `json:"team_id,omitempty"`
-	PlayerID *uint      `json:"player_id,omitempty"`
-	Status   *string    `json:"status,omitempty"`
-	DateFrom *time.Time `json:"date_from,omitempty"`
-	DateTo   *time.Time `json:"date_to,omitempty"`
-	Page     int        `json:"page"`
-	PerPage  int        `json:"per_page"`
+	TeamID       *uint      `json:"team_id,omitempty"`
+	PlayerID     *uint      `json:"player_id,omitempty"`
+	Status       *string    `json:"status,omitempty"`
+	TournamentID *uint      `json:"tournament_id,omitempty"`
+	DateFrom     *time.Time `json:"date_from,omitempty"`
+	DateTo       *time.Time `json:"date_to,omitempty"`
+	Page         int        `json:"page"`
+	PerPage      int        `json:"per_page"`
 }
 
 func (s *TeamMatchService) GetTeamMatches(filters TeamMatchFilters) (*models.PaginatedTeamMatchResponse, error) {
@@ -95,6 +98,10 @@ func (s *TeamMatchService) GetTeamMatches(filters TeamMatchFilters) (*models.Pag
 
 	if filters.Status != nil {
 		query = query.Where("status = ?", *filters.Status)
+	}
+
+	if filters.TournamentID != nil {
+		query = query.Where("tournament_id = ?", *filters.TournamentID)
 	}
 
 	if filters.DateFrom != nil {
@@ -174,6 +181,20 @@ func (s *TeamMatchService) CreateTeamMatch(req models.CreateTeamMatchRequest) (*
 		return nil, errors.New("teams cannot share players")
 	}
 
+	// Validate tournament if provided
+	if req.TournamentID != nil {
+		var tournament models.Tournament
+		if err := s.db.First(&tournament, *req.TournamentID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, errors.New("tournament not found")
+			}
+			return nil, err
+		}
+		if tournament.Status != "ongoing" {
+			return nil, errors.New("tournament is not ongoing")
+		}
+	}
+
 	// Start transaction
 	tx := s.db.Begin()
 	defer func() {
@@ -188,6 +209,7 @@ func (s *TeamMatchService) CreateTeamMatch(req models.CreateTeamMatchRequest) (*
 		Team1ID:      req.Team1ID,
 		Team2ID:      req.Team2ID,
 		WinnerTeamID: req.WinnerTeamID,
+		TournamentID: req.TournamentID,
 		Status:       "pending",
 		CreatedAt:    now,
 	}
@@ -280,6 +302,20 @@ func (s *TeamMatchService) UpdateTeamMatchStatus(matchID uint, req models.Update
 	if match.Status == "confirmed" {
 		if err := s.recalculateTeamRanks(); err != nil {
 			// Log error but don't fail the request
+		}
+
+		// Update tournament stats if match is linked to a tournament
+		if match.TournamentID != nil {
+			isTeam1Winner := match.WinnerTeamID == match.Team1ID
+			if err := s.tournamentService.IncrementTournamentNbMatches(*match.TournamentID); err != nil {
+				// Log error but don't fail the request
+			}
+			if err := s.tournamentService.UpdateTournamentTeamStats(*match.TournamentID, match.Team1ID, isTeam1Winner); err != nil {
+				// Log error but don't fail the request
+			}
+			if err := s.tournamentService.UpdateTournamentTeamStats(*match.TournamentID, match.Team2ID, !isTeam1Winner); err != nil {
+				// Log error but don't fail the request
+			}
 		}
 	}
 

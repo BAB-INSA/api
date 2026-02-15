@@ -214,7 +214,7 @@ func GetCoreMigrations() []MigrationDefinition {
 					DROP INDEX IF EXISTS idx_elo_history_match_type;
 					DROP INDEX IF EXISTS idx_elo_history_opponent_team_id;
 					ALTER TABLE elo_history DROP CONSTRAINT IF EXISTS fk_elo_history_opponent_team;
-					ALTER TABLE elo_history 
+					ALTER TABLE elo_history
 					DROP COLUMN IF EXISTS match_type,
 					DROP COLUMN IF EXISTS opponent_team_id;
 				`).Error; err != nil {
@@ -235,13 +235,115 @@ func GetCoreMigrations() []MigrationDefinition {
 				if err := db.Exec(`
 					DROP INDEX IF EXISTS idx_players_team_rank;
 					DROP INDEX IF EXISTS idx_players_team_elo_rating;
-					ALTER TABLE players 
+					ALTER TABLE players
 					DROP COLUMN IF EXISTS team_losses,
 					DROP COLUMN IF EXISTS team_wins,
 					DROP COLUMN IF EXISTS team_total_matches,
 					DROP COLUMN IF EXISTS team_rank,
 					DROP COLUMN IF EXISTS team_elo_rating;
 				`).Error; err != nil {
+					return err
+				}
+
+				return nil
+			},
+		},
+		{
+			Name: "2026_02_15_000000_add_tournament_support",
+			Up: func(db *gorm.DB) error {
+				// Create tournaments table
+				if err := db.Exec(`
+					CREATE TABLE IF NOT EXISTS tournaments (
+						id BIGSERIAL PRIMARY KEY,
+						name VARCHAR(255) NOT NULL,
+						slug VARCHAR(255) UNIQUE NOT NULL,
+						type VARCHAR(20) NOT NULL DEFAULT 'team',
+						status VARCHAR(20) NOT NULL DEFAULT 'ongoing',
+						description TEXT,
+						nb_participants INT DEFAULT 0,
+						nb_matches INT DEFAULT 0,
+						created_at TIMESTAMP DEFAULT NOW(),
+						updated_at TIMESTAMP DEFAULT NOW(),
+						deleted_at TIMESTAMP NULL
+					);
+					CREATE INDEX IF NOT EXISTS idx_tournaments_deleted_at ON tournaments(deleted_at);
+					CREATE INDEX IF NOT EXISTS idx_tournaments_slug ON tournaments(slug);
+					CREATE INDEX IF NOT EXISTS idx_tournaments_type ON tournaments(type);
+					CREATE INDEX IF NOT EXISTS idx_tournaments_status ON tournaments(status);
+				`).Error; err != nil {
+					return err
+				}
+
+				// Create tournament_teams join table
+				if err := db.Exec(`
+					CREATE TABLE IF NOT EXISTS tournament_teams (
+						id BIGSERIAL PRIMARY KEY,
+						tournament_id BIGINT NOT NULL,
+						team_id BIGINT NOT NULL,
+						wins INT DEFAULT 0,
+						losses INT DEFAULT 0,
+						created_at TIMESTAMP DEFAULT NOW(),
+						updated_at TIMESTAMP DEFAULT NOW(),
+						deleted_at TIMESTAMP NULL,
+						FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE,
+						FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+						UNIQUE(tournament_id, team_id)
+					);
+					CREATE INDEX IF NOT EXISTS idx_tournament_teams_deleted_at ON tournament_teams(deleted_at);
+					CREATE INDEX IF NOT EXISTS idx_tournament_teams_tournament_id ON tournament_teams(tournament_id);
+					CREATE INDEX IF NOT EXISTS idx_tournament_teams_team_id ON tournament_teams(team_id);
+				`).Error; err != nil {
+					return err
+				}
+
+				// Add tournament_id to team_matches
+				if err := db.Exec(`
+					ALTER TABLE team_matches ADD COLUMN IF NOT EXISTS tournament_id BIGINT;
+					ALTER TABLE team_matches ADD CONSTRAINT fk_team_matches_tournament
+						FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE SET NULL;
+					CREATE INDEX IF NOT EXISTS idx_team_matches_tournament_id ON team_matches(tournament_id);
+				`).Error; err != nil {
+					return err
+				}
+
+				// Add tournament_id to matches
+				if err := db.Exec(`
+					ALTER TABLE matches ADD COLUMN IF NOT EXISTS tournament_id BIGINT;
+					ALTER TABLE matches ADD CONSTRAINT fk_matches_tournament
+						FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE SET NULL;
+					CREATE INDEX IF NOT EXISTS idx_matches_tournament_id ON matches(tournament_id);
+				`).Error; err != nil {
+					return err
+				}
+
+				return nil
+			},
+			Down: func(db *gorm.DB) error {
+				// Remove tournament_id from matches
+				if err := db.Exec(`
+					DROP INDEX IF EXISTS idx_matches_tournament_id;
+					ALTER TABLE matches DROP CONSTRAINT IF EXISTS fk_matches_tournament;
+					ALTER TABLE matches DROP COLUMN IF EXISTS tournament_id;
+				`).Error; err != nil {
+					return err
+				}
+
+				// Remove tournament_id from team_matches
+				if err := db.Exec(`
+					DROP INDEX IF EXISTS idx_team_matches_tournament_id;
+					ALTER TABLE team_matches DROP CONSTRAINT IF EXISTS fk_team_matches_tournament;
+					ALTER TABLE team_matches DROP COLUMN IF EXISTS tournament_id;
+				`).Error; err != nil {
+					return err
+				}
+
+				// Drop tournament_teams table
+				if err := db.Exec("DROP TABLE IF EXISTS tournament_teams CASCADE").Error; err != nil {
+					return err
+				}
+
+				// Drop tournaments table
+				if err := db.Exec("DROP TABLE IF EXISTS tournaments CASCADE").Error; err != nil {
 					return err
 				}
 

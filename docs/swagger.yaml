@@ -58,6 +58,8 @@ definitions:
         type: integer
       player2_id:
         type: integer
+      tournament_id:
+        type: integer
       winner_id:
         type: integer
     required:
@@ -70,6 +72,8 @@ definitions:
       team1_id:
         type: integer
       team2_id:
+        type: integer
+      tournament_id:
         type: integer
       winner_team_id:
         type: integer
@@ -89,6 +93,21 @@ definitions:
     required:
     - player1_id
     - player2_id
+    type: object
+  models.CreateTournamentRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      type:
+        enum:
+        - solo
+        - team
+        type: string
+    required:
+    - name
+    - type
     type: object
   models.EloHistory:
     properties:
@@ -126,6 +145,13 @@ definitions:
       updated_at:
         type: string
     type: object
+  models.JoinTournamentRequest:
+    properties:
+      team_id:
+        type: integer
+    required:
+    - team_id
+    type: object
   models.LoginRequest:
     properties:
       email:
@@ -157,6 +183,10 @@ definitions:
       status:
         description: pending, confirmed, rejected, cancelled
         type: string
+      tournament:
+        $ref: '#/definitions/models.Tournament'
+      tournament_id:
+        type: integer
       updated_at:
         type: string
       winner:
@@ -214,6 +244,36 @@ definitions:
       data:
         items:
           $ref: '#/definitions/models.Team'
+        type: array
+      page:
+        type: integer
+      pageSize:
+        type: integer
+      total:
+        type: integer
+      totalPages:
+        type: integer
+    type: object
+  models.PaginatedTournamentTeamsResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.TournamentTeam'
+        type: array
+      page:
+        type: integer
+      pageSize:
+        type: integer
+      total:
+        type: integer
+      totalPages:
+        type: integer
+    type: object
+  models.PaginatedTournamentsResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.Tournament'
         type: array
       page:
         type: integer
@@ -419,6 +479,10 @@ definitions:
         $ref: '#/definitions/models.Team'
       team2_id:
         type: integer
+      tournament:
+        $ref: '#/definitions/models.Tournament'
+      tournament_id:
+        type: integer
       updated_at:
         type: string
       winner_team:
@@ -436,6 +500,102 @@ definitions:
       refresh_token:
         type: string
       token_type:
+        type: string
+    type: object
+  models.Tournament:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      matches:
+        items:
+          $ref: '#/definitions/models.Match'
+        type: array
+      name:
+        type: string
+      slug:
+        type: string
+      status:
+        description: ongoing, finished
+        type: string
+      team_matches:
+        items:
+          $ref: '#/definitions/models.TeamMatch'
+        type: array
+      tournament_teams:
+        description: Relationships
+        items:
+          $ref: '#/definitions/models.TournamentTeam'
+        type: array
+      type:
+        description: solo, team
+        type: string
+      updated_at:
+        type: string
+    type: object
+  models.TournamentResponse:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      matches:
+        items:
+          $ref: '#/definitions/models.Match'
+        type: array
+      name:
+        type: string
+      slug:
+        type: string
+      stats:
+        $ref: '#/definitions/models.TournamentStats'
+      status:
+        description: ongoing, finished
+        type: string
+      team_matches:
+        items:
+          $ref: '#/definitions/models.TeamMatch'
+        type: array
+      tournament_teams:
+        description: Relationships
+        items:
+          $ref: '#/definitions/models.TournamentTeam'
+        type: array
+      type:
+        description: solo, team
+        type: string
+      updated_at:
+        type: string
+    type: object
+  models.TournamentStats:
+    properties:
+      total_matches:
+        type: integer
+      total_teams:
+        type: integer
+    type: object
+  models.TournamentTeam:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      team:
+        $ref: '#/definitions/models.Team'
+      team_id:
+        type: integer
+      tournament:
+        allOf:
+        - $ref: '#/definitions/models.Tournament'
+        description: Relationships
+      tournament_id:
+        type: integer
+      updated_at:
         type: string
     type: object
   models.UpdateMatchStatusRequest:
@@ -464,6 +624,23 @@ definitions:
     properties:
       name:
         type: string
+    type: object
+  models.UpdateTournamentRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+    type: object
+  models.UpdateTournamentStatusRequest:
+    properties:
+      status:
+        enum:
+        - ongoing
+        - finished
+        type: string
+    required:
+    - status
     type: object
   models.UpdateUserRequest:
     properties:
@@ -1734,51 +1911,6 @@ paths:
       summary: Cancel team match
       tags:
       - team-matches
-  /team-matches/{id}/confirm:
-    patch:
-      description: Confirm a pending team match
-      parameters:
-      - description: Team Match ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.TeamMatch'
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "401":
-          description: Unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      security:
-      - BearerAuth: []
-      summary: Confirm team match
-      tags:
-      - team-matches
   /team-matches/{id}/reject:
     patch:
       description: Reject a pending team match
@@ -2075,48 +2207,6 @@ paths:
       summary: Update team
       tags:
       - teams
-  /teams/get-or-create:
-    post:
-      consumes:
-      - application/json
-      description: Find existing team or create new one with two players
-      parameters:
-      - description: Team data
-        in: body
-        name: team
-        required: true
-        schema:
-          $ref: '#/definitions/models.CreateTeamRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.Team'
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "401":
-          description: Unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      security:
-      - BearerAuth: []
-      summary: Get or create team
-      tags:
-      - teams
   /teams/players/{playerId}:
     get:
       description: Get all teams that include a specific player
@@ -2156,6 +2246,466 @@ paths:
       summary: Get teams by player
       tags:
       - teams
+  /tournaments:
+    get:
+      description: Get all tournaments with optional status filter
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10, max: 100)'
+        in: query
+        name: pageSize
+        type: integer
+      - description: Filter by status
+        enum:
+        - ongoing
+        - finished
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.PaginatedTournamentsResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get all tournaments
+      tags:
+      - tournaments
+    post:
+      consumes:
+      - application/json
+      description: Create a new tournament (admin only)
+      parameters:
+      - description: Tournament data
+        in: body
+        name: tournament
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateTournamentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Tournament'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a new tournament
+      tags:
+      - tournaments
+  /tournaments/{id}:
+    delete:
+      description: Delete a tournament (admin only)
+      parameters:
+      - description: Tournament ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete tournament
+      tags:
+      - tournaments
+    get:
+      description: Get tournament information with teams
+      parameters:
+      - description: Tournament ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.TournamentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get tournament by ID
+      tags:
+      - tournaments
+    put:
+      consumes:
+      - application/json
+      description: Update tournament name or description (admin only)
+      parameters:
+      - description: Tournament ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Tournament update data
+        in: body
+        name: tournament
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateTournamentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Tournament'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update tournament
+      tags:
+      - tournaments
+  /tournaments/{id}/join:
+    post:
+      consumes:
+      - application/json
+      description: Register a team for a tournament (must be a team member)
+      parameters:
+      - description: Tournament ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Join request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.JoinTournamentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.TournamentTeam'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Join tournament
+      tags:
+      - tournaments
+  /tournaments/{id}/matches:
+    get:
+      description: Get paginated list of matches in a tournament
+      parameters:
+      - description: Tournament ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10, max: 100)'
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.PaginatedTeamMatchResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get tournament matches
+      tags:
+      - tournaments
+  /tournaments/{id}/stats:
+    get:
+      description: Get calculated statistics for a tournament
+      parameters:
+      - description: Tournament ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.TournamentStats'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get tournament stats
+      tags:
+      - tournaments
+  /tournaments/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      description: Change tournament status (admin only)
+      parameters:
+      - description: Tournament ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Status update
+        in: body
+        name: status
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateTournamentStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Tournament'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update tournament status
+      tags:
+      - tournaments
+  /tournaments/{id}/teams:
+    get:
+      description: Get paginated list of teams registered in a tournament
+      parameters:
+      - description: Tournament ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10, max: 100)'
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.PaginatedTournamentTeamsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get tournament teams
+      tags:
+      - tournaments
+  /tournaments/{id}/teams/{teamId}:
+    delete:
+      description: Remove a team from a tournament (must be a team member)
+      parameters:
+      - description: Tournament ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Team ID
+        in: path
+        name: teamId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Leave tournament
+      tags:
+      - tournaments
   /users:
     get:
       description: Get paginated list of users with optional search

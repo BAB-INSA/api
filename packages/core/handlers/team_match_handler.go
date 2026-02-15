@@ -59,6 +59,7 @@ func (h *TeamMatchHandler) CreateTeamMatch(c *gin.Context) {
 // @Param per_page query int false "Items per page (default: 10, max: 100)"
 // @Param team_id query int false "Filter by team ID"
 // @Param player_id query int false "Filter by player ID"
+// @Param tournament_id query int false "Filter by tournament ID"
 // @Param status query string false "Filter by status" Enums(pending, confirmed, rejected, cancelled)
 // @Param date_from query string false "Filter from date (YYYY-MM-DD format)"
 // @Param date_to query string false "Filter to date (YYYY-MM-DD format)"
@@ -101,6 +102,14 @@ func (h *TeamMatchHandler) GetTeamMatches(c *gin.Context) {
 		if playerID, err := strconv.ParseUint(playerIDParam, 10, 32); err == nil {
 			playerIDUint := uint(playerID)
 			filters.PlayerID = &playerIDUint
+		}
+	}
+
+	// Parse tournament_id filter
+	if tournamentIDParam := c.Query("tournament_id"); tournamentIDParam != "" {
+		if tournamentID, err := strconv.ParseUint(tournamentIDParam, 10, 32); err == nil {
+			tournamentIDUint := uint(tournamentID)
+			filters.TournamentID = &tournamentIDUint
 		}
 	}
 
