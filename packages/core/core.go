@@ -22,6 +22,8 @@ type Module struct {
 	TeamService           *services.TeamService
 	TeamMatchHandler      *handlers.TeamMatchHandler
 	TeamMatchService      *services.TeamMatchService
+	TournamentHandler     *handlers.TournamentHandler
+	TournamentService     *services.TournamentService
 	EloHistoryHandler     *handlers.EloHistoryHandler
 	EloHistoryService     *services.EloHistoryService
 	StatsHandler          *handlers.StatsHandler
@@ -44,6 +46,9 @@ func NewModule(db *gorm.DB) *Module {
 	teamMatchService := services.NewTeamMatchService(db)
 	teamMatchHandler := handlers.NewTeamMatchHandler(db)
 
+	tournamentService := services.NewTournamentService(db)
+	tournamentHandler := handlers.NewTournamentHandler(db)
+
 	eloHistoryService := services.NewEloHistoryService(db)
 	eloHistoryHandler := handlers.NewEloHistoryHandler(eloHistoryService)
 
@@ -63,6 +68,8 @@ func NewModule(db *gorm.DB) *Module {
 		TeamService:           teamService,
 		TeamMatchHandler:      teamMatchHandler,
 		TeamMatchService:      teamMatchService,
+		TournamentHandler:     tournamentHandler,
+		TournamentService:     tournamentService,
 		EloHistoryHandler:     eloHistoryHandler,
 		EloHistoryService:     eloHistoryService,
 		StatsHandler:          statsHandler,
@@ -114,6 +121,19 @@ func (m *Module) SetupRoutes(r *gin.Engine) {
 		teamMatches.PATCH("/:id", authMiddleware.JWTMiddleware(), m.TeamMatchHandler.UpdateTeamMatchStatus)
 		teamMatches.PATCH("/:id/reject", authMiddleware.JWTMiddleware(), m.TeamMatchHandler.RejectTeamMatch)
 		teamMatches.PATCH("/:id/cancel", authMiddleware.JWTMiddleware(), authMiddleware.RequireRole(m.db, authModels.RoleAdmin), m.TeamMatchHandler.CancelTeamMatch)
+	}
+
+	tournaments := r.Group("/tournaments")
+	{
+		tournaments.GET("", m.TournamentHandler.GetAllTournaments)
+		tournaments.GET("/:id", m.TournamentHandler.GetTournament)
+		tournaments.GET("/:id/teams", m.TournamentHandler.GetTournamentTeams)
+		tournaments.GET("/:id/matches", m.TournamentHandler.GetTournamentMatches)
+		tournaments.POST("", authMiddleware.JWTMiddleware(), authMiddleware.RequireRole(m.db, authModels.RoleAdmin), m.TournamentHandler.CreateTournament)
+		tournaments.PUT("/:id", authMiddleware.JWTMiddleware(), authMiddleware.RequireRole(m.db, authModels.RoleAdmin), m.TournamentHandler.UpdateTournament)
+		tournaments.POST("/:id/join", authMiddleware.JWTMiddleware(), m.TournamentHandler.JoinTournament)
+		tournaments.DELETE("/:id/teams/:teamId", authMiddleware.JWTMiddleware(), m.TournamentHandler.LeaveTournament)
+		tournaments.DELETE("/:id", authMiddleware.JWTMiddleware(), authMiddleware.RequireRole(m.db, authModels.RoleAdmin), m.TournamentHandler.DeleteTournament)
 	}
 
 	eloHistory := r.Group("/elo-history")

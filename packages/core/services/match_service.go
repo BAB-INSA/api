@@ -142,14 +142,29 @@ func (s *MatchService) CreateMatch(req models.CreateMatchRequest) (*models.Match
 		}
 	}()
 
+	// Validate tournament if provided
+	if req.TournamentID != nil {
+		var tournament models.Tournament
+		if err := s.db.First(&tournament, *req.TournamentID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, errors.New("tournament not found")
+			}
+			return nil, err
+		}
+		if tournament.Status != "ongoing" {
+			return nil, errors.New("tournament is not ongoing")
+		}
+	}
+
 	// Create the match in pending status
 	now := time.Now()
 	match := models.Match{
-		Player1ID: req.Player1ID,
-		Player2ID: req.Player2ID,
-		WinnerID:  req.WinnerID,
-		Status:    "pending",
-		CreatedAt: now,
+		Player1ID:    req.Player1ID,
+		Player2ID:    req.Player2ID,
+		WinnerID:     req.WinnerID,
+		TournamentID: req.TournamentID,
+		Status:       "pending",
+		CreatedAt:    now,
 		// ConfirmedAt will be set when confirmed
 	}
 

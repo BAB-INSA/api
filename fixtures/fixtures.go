@@ -69,6 +69,12 @@ func (f *Fixtures) GenerateTestData() error {
 		return fmt.Errorf("failed to recalculate ranks: %w", err)
 	}
 
+	// Generate tournaments
+	err = f.generateTournaments(teams)
+	if err != nil {
+		return fmt.Errorf("failed to generate tournaments: %w", err)
+	}
+
 	log.Println("Fixtures generated successfully!")
 	log.Printf("Created %d users, %d matches, %d teams, %d team matches and ELO history", len(users), len(matches), len(teams), len(teamMatches))
 	return nil
@@ -93,7 +99,7 @@ func (f *Fixtures) generateUsers() ([]authModels.User, error) {
 		if i < 0 || i >= len(usernames) {
 			return nil, fmt.Errorf("invalid user index: %d", i)
 		}
-		userID := uint(i + 1) // Force IDs 1, 2, 3, ...
+		userID := uint(i + 1) // #nosec G115 -- Force IDs 1, 2, 3, ...
 
 		user := authModels.User{
 			ID:          userID,
@@ -102,7 +108,7 @@ func (f *Fixtures) generateUsers() ([]authModels.User, error) {
 			Slug:        slug,
 			Password:    hashedPassword,
 			Enabled:     true,
-			NbConnexion: rand.Intn(50) + 1,
+			NbConnexion: rand.Intn(50) + 1, // #nosec G404
 			Roles:       authModels.GetDefaultRoles(),
 		}
 
@@ -145,14 +151,14 @@ func (f *Fixtures) generateMatches(users []authModels.User) ([]models.Match, err
 
 	for i := 0; i < 50; i++ {
 		// Random date in the last 30 days
-		daysAgo := rand.Intn(30)
-		matchDate := now.AddDate(0, 0, -daysAgo).Add(time.Duration(rand.Intn(24)) * time.Hour)
+		daysAgo := rand.Intn(30)                                                               // #nosec G404
+		matchDate := now.AddDate(0, 0, -daysAgo).Add(time.Duration(rand.Intn(24)) * time.Hour) // #nosec G404
 
 		// Pick two random different players
-		player1 := users[rand.Intn(len(users))]
+		player1 := users[rand.Intn(len(users))] // #nosec G404
 		var player2 authModels.User
 		for {
-			player2 = users[rand.Intn(len(users))]
+			player2 = users[rand.Intn(len(users))] // #nosec G404
 			if player2.ID != player1.ID {
 				break
 			}
@@ -160,7 +166,8 @@ func (f *Fixtures) generateMatches(users []authModels.User) ([]models.Match, err
 
 		// Random winner
 		var winner uint
-		if rand.Float32() < 0.5 {
+		winRoll := rand.Float32() // #nosec G404
+		if winRoll < 0.5 {
 			winner = player1.ID
 		} else {
 			winner = player2.ID
@@ -169,7 +176,8 @@ func (f *Fixtures) generateMatches(users []authModels.User) ([]models.Match, err
 		// Random status (most confirmed)
 		status := "confirmed"
 		confirmedAt := &matchDate
-		if rand.Float32() < 0.1 { // 10% pending
+		statusRoll := rand.Float32() // #nosec G404
+		if statusRoll < 0.1 {
 			status = "pending"
 			confirmedAt = nil
 		}
@@ -321,6 +329,8 @@ func (f *Fixtures) ClearAllData() error {
 
 	// Delete in correct order due to foreign key constraints
 	tables := []interface{}{
+		&models.TournamentTeam{},
+		&models.Tournament{},
 		&models.EloHistory{},
 		&models.TeamMatch{},
 		&models.Team{},
@@ -344,6 +354,8 @@ func (f *Fixtures) ClearAllData() error {
 		"ALTER SEQUENCE team_matches_id_seq RESTART WITH 1",
 		"ALTER SEQUENCE elo_history_id_seq RESTART WITH 1",
 		"ALTER SEQUENCE refresh_tokens_id_seq RESTART WITH 1",
+		"ALTER SEQUENCE tournaments_id_seq RESTART WITH 1",
+		"ALTER SEQUENCE tournament_teams_id_seq RESTART WITH 1",
 	}
 
 	for _, seq := range sequences {
@@ -415,14 +427,14 @@ func (f *Fixtures) generateTeamMatches(teams []models.Team) ([]models.TeamMatch,
 
 	for i := 0; i < 20; i++ {
 		// Random date in the last 30 days
-		daysAgo := rand.Intn(30)
-		matchDate := now.AddDate(0, 0, -daysAgo).Add(time.Duration(rand.Intn(24)) * time.Hour)
+		daysAgo := rand.Intn(30)                                                               // #nosec G404
+		matchDate := now.AddDate(0, 0, -daysAgo).Add(time.Duration(rand.Intn(24)) * time.Hour) // #nosec G404
 
 		// Pick two random different teams
-		team1 := teams[rand.Intn(len(teams))]
+		team1 := teams[rand.Intn(len(teams))] // #nosec G404
 		var team2 models.Team
 		for {
-			team2 = teams[rand.Intn(len(teams))]
+			team2 = teams[rand.Intn(len(teams))] // #nosec G404
 			if team2.ID != team1.ID {
 				break
 			}
@@ -437,7 +449,8 @@ func (f *Fixtures) generateTeamMatches(teams []models.Team) ([]models.TeamMatch,
 
 		// Random winner
 		var winnerTeamID uint
-		if rand.Float32() < 0.5 {
+		winRoll := rand.Float32() // #nosec G404
+		if winRoll < 0.5 {
 			winnerTeamID = team1.ID
 		} else {
 			winnerTeamID = team2.ID
@@ -446,7 +459,8 @@ func (f *Fixtures) generateTeamMatches(teams []models.Team) ([]models.TeamMatch,
 		// Random status (most confirmed)
 		status := "confirmed"
 		confirmedAt := &matchDate
-		if rand.Float32() < 0.1 { // 10% pending
+		statusRoll := rand.Float32() // #nosec G404
+		if statusRoll < 0.1 {
 			status = "pending"
 			confirmedAt = nil
 		}
@@ -736,4 +750,180 @@ func (f *Fixtures) recalculateAllRanks() error {
 
 	log.Println("Successfully recalculated solo and team ranks for all players")
 	return nil
+}
+
+// generateTournaments creates 3 tournaments (2 finished, 1 ongoing) with registered teams and matches
+func (f *Fixtures) generateTournaments(teams []models.Team) error {
+	now := time.Now()
+
+	tournamentDefs := []struct {
+		name        string
+		slug        string
+		typ         string
+		status      string
+		description string
+		createdAt   time.Time
+	}{
+		{
+			name:        "Tournoi de Noël",
+			slug:        "tournoi-de-noel",
+			typ:         "team",
+			status:      "finished",
+			description: "Le grand tournoi de Noël de l'association BAB-INSA",
+			createdAt:   now.AddDate(0, -2, 0),
+		},
+		{
+			name:        "Coupe de Printemps",
+			slug:        "coupe-de-printemps",
+			typ:         "team",
+			status:      "finished",
+			description: "La coupe de printemps, édition 2025",
+			createdAt:   now.AddDate(0, -1, 0),
+		},
+		{
+			name:        "Tournoi d'Hiver",
+			slug:        "tournoi-d-hiver",
+			typ:         "team",
+			status:      "opened",
+			description: "Le tournoi d'hiver ouvert aux inscriptions",
+			createdAt:   now.AddDate(0, 0, -7),
+		},
+	}
+
+	// Teams to register per tournament (indices into teams slice)
+	// Tournament 1 (finished): 4 teams, Tournament 2 (finished): 3 teams, Tournament 3 (opened): 4 teams
+	teamRegistrations := [][]int{
+		{0, 1, 2, 3},
+		{0, 4, 5},
+		{1, 2, 4, 6},
+	}
+
+	for i, def := range tournamentDefs {
+		tournament := models.Tournament{
+			Name:        def.name,
+			Slug:        def.slug,
+			Type:        def.typ,
+			Status:      def.status,
+			Description: def.description,
+			CreatedAt:   def.createdAt,
+		}
+
+		if err := f.db.Create(&tournament).Error; err != nil {
+			return err
+		}
+
+		// Register teams
+		registeredTeams := []models.Team{}
+		for _, teamIdx := range teamRegistrations[i] {
+			if teamIdx >= len(teams) {
+				continue
+			}
+
+			tt := models.TournamentTeam{
+				TournamentID: tournament.ID,
+				TeamID:       teams[teamIdx].ID,
+			}
+
+			if err := f.db.Create(&tt).Error; err != nil {
+				return err
+			}
+			registeredTeams = append(registeredTeams, teams[teamIdx])
+		}
+
+		// Update nb_participants
+		f.db.Model(&tournament).Update("nb_participants", len(registeredTeams))
+
+		// Generate matches for finished tournaments
+		matchCount := 0
+		if def.status == "finished" && len(registeredTeams) >= 2 {
+			matchCount = f.generateTournamentMatches(tournament, registeredTeams)
+		}
+
+		// Update nb_matches
+		if matchCount > 0 {
+			f.db.Model(&tournament).Update("nb_matches", matchCount)
+		}
+
+		log.Printf("Created tournament: %s (ID: %d, status: %s, %d teams, %d matches)", def.name, tournament.ID, def.status, len(registeredTeams), matchCount)
+	}
+
+	log.Println("Generated 3 tournaments (2 finished, 1 opened)")
+	return nil
+}
+
+// generateTournamentMatches creates round-robin matches for a finished tournament
+func (f *Fixtures) generateTournamentMatches(tournament models.Tournament, registeredTeams []models.Team) int {
+	matchCount := 0
+	tournamentID := tournament.ID
+
+	// Track wins/losses per team for TournamentTeam stats
+	teamWins := make(map[uint]int)
+	teamLosses := make(map[uint]int)
+
+	// Round-robin: each team plays every other team
+	for a := 0; a < len(registeredTeams); a++ {
+		for b := a + 1; b < len(registeredTeams); b++ {
+			team1 := registeredTeams[a]
+			team2 := registeredTeams[b]
+
+			// Skip if teams share a player
+			if team1.Player1ID == team2.Player1ID || team1.Player1ID == team2.Player2ID ||
+				team1.Player2ID == team2.Player1ID || team1.Player2ID == team2.Player2ID {
+				continue
+			}
+
+			// Match date: spread across the tournament period (starting a few days after creation)
+			daysOffset := 3 + matchCount*2
+			matchDate := tournament.CreatedAt.AddDate(0, 0, daysOffset).Add(time.Duration(10+rand.Intn(10)) * time.Hour) // #nosec G404
+
+			// Random winner
+			var winnerTeamID uint
+			winRoll := rand.Float32() // #nosec G404
+			if winRoll < 0.5 {
+				winnerTeamID = team1.ID
+			} else {
+				winnerTeamID = team2.ID
+			}
+
+			confirmedAt := matchDate.Add(time.Duration(rand.Intn(60)) * time.Minute) // #nosec G404
+
+			teamMatch := models.TeamMatch{
+				Team1ID:      team1.ID,
+				Team2ID:      team2.ID,
+				WinnerTeamID: winnerTeamID,
+				Status:       "confirmed",
+				TournamentID: &tournamentID,
+				CreatedAt:    matchDate,
+				ConfirmedAt:  &confirmedAt,
+			}
+
+			if err := f.db.Create(&teamMatch).Error; err != nil {
+				log.Printf("Error creating tournament match: %v", err)
+				continue
+			}
+
+			// Track wins/losses
+			if winnerTeamID == team1.ID {
+				teamWins[team1.ID]++
+				teamLosses[team2.ID]++
+			} else {
+				teamWins[team2.ID]++
+				teamLosses[team1.ID]++
+			}
+
+			matchCount++
+		}
+	}
+
+	// Update TournamentTeam wins/losses
+	for _, team := range registeredTeams {
+		f.db.Model(&models.TournamentTeam{}).
+			Where("tournament_id = ? AND team_id = ?", tournamentID, team.ID).
+			Updates(map[string]interface{}{
+				"wins":   teamWins[team.ID],
+				"losses": teamLosses[team.ID],
+			})
+	}
+
+	return matchCount
 }

@@ -17,10 +17,13 @@ type Match struct {
 	UpdatedAt   time.Time      `json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 
+	TournamentID *uint `gorm:"constraint:OnDelete:SET NULL" json:"tournament_id"`
+
 	// Relationships
-	Player1 Player `gorm:"foreignKey:Player1ID;references:ID" json:"player1,omitempty"`
-	Player2 Player `gorm:"foreignKey:Player2ID;references:ID" json:"player2,omitempty"`
-	Winner  Player `gorm:"foreignKey:WinnerID;references:ID" json:"winner,omitempty"`
+	Player1    Player      `gorm:"foreignKey:Player1ID;references:ID" json:"player1,omitempty"`
+	Player2    Player      `gorm:"foreignKey:Player2ID;references:ID" json:"player2,omitempty"`
+	Winner     Player      `gorm:"foreignKey:WinnerID;references:ID" json:"winner,omitempty"`
+	Tournament *Tournament `gorm:"foreignKey:TournamentID" json:"tournament,omitempty"`
 }
 
 func (Match) TableName() string {
@@ -36,9 +39,10 @@ type PaginatedMatchResponse struct {
 }
 
 type CreateMatchRequest struct {
-	Player1ID uint `json:"player1_id" binding:"required"`
-	Player2ID uint `json:"player2_id" binding:"required"`
-	WinnerID  uint `json:"winner_id" binding:"required"`
+	Player1ID    uint  `json:"player1_id" binding:"required"`
+	Player2ID    uint  `json:"player2_id" binding:"required"`
+	WinnerID     uint  `json:"winner_id" binding:"required"`
+	TournamentID *uint `json:"tournament_id,omitempty"`
 }
 
 type UpdateMatchStatusRequest struct {
