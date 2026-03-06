@@ -231,8 +231,8 @@ func (s *TeamService) GetTeamAverageElo(teamID uint) (float64, error) {
 }
 
 func (s *TeamService) UpdateTeamStats(teamID uint, won bool, eloChange float64) error {
-	team, err := s.GetTeamByID(teamID)
-	if err != nil {
+	var team models.Team
+	if err := s.db.First(&team, teamID).Error; err != nil {
 		return err
 	}
 

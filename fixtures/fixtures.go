@@ -536,45 +536,41 @@ func (f *Fixtures) generateTeamEloHistory(teams []models.Team, teamMatches []mod
 		team2Player2Change := coreUtils.CalculateTeamEloChange(playerTeamElos[team2.Player2ID], team1AvgElo, !isTeam1Winner)
 
 		// Create ELO history entries for team match
-		eloHistories := []models.EloHistory{
+		eloHistories := []models.TeamEloHistory{
 			{
 				PlayerID:       team1.Player1ID,
-				MatchID:        teamMatch.ID,
+				TeamMatchID:    teamMatch.ID,
 				EloBefore:      playerTeamElos[team1.Player1ID],
 				EloAfter:       playerTeamElos[team1.Player1ID] + team1Player1Change,
 				EloChange:      team1Player1Change,
 				OpponentTeamID: &teamMatch.Team2ID,
-				MatchType:      "team",
 				CreatedAt:      teamMatch.CreatedAt,
 			},
 			{
 				PlayerID:       team1.Player2ID,
-				MatchID:        teamMatch.ID,
+				TeamMatchID:    teamMatch.ID,
 				EloBefore:      playerTeamElos[team1.Player2ID],
 				EloAfter:       playerTeamElos[team1.Player2ID] + team1Player2Change,
 				EloChange:      team1Player2Change,
 				OpponentTeamID: &teamMatch.Team2ID,
-				MatchType:      "team",
 				CreatedAt:      teamMatch.CreatedAt,
 			},
 			{
 				PlayerID:       team2.Player1ID,
-				MatchID:        teamMatch.ID,
+				TeamMatchID:    teamMatch.ID,
 				EloBefore:      playerTeamElos[team2.Player1ID],
 				EloAfter:       playerTeamElos[team2.Player1ID] + team2Player1Change,
 				EloChange:      team2Player1Change,
 				OpponentTeamID: &teamMatch.Team1ID,
-				MatchType:      "team",
 				CreatedAt:      teamMatch.CreatedAt,
 			},
 			{
 				PlayerID:       team2.Player2ID,
-				MatchID:        teamMatch.ID,
+				TeamMatchID:    teamMatch.ID,
 				EloBefore:      playerTeamElos[team2.Player2ID],
 				EloAfter:       playerTeamElos[team2.Player2ID] + team2Player2Change,
 				EloChange:      team2Player2Change,
 				OpponentTeamID: &teamMatch.Team1ID,
-				MatchType:      "team",
 				CreatedAt:      teamMatch.CreatedAt,
 			},
 		}

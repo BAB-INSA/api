@@ -348,45 +348,41 @@ func (s *TeamMatchService) updateTeamEloAndStats(tx *gorm.DB, match *models.Team
 	team2EloChange := (team2Player1Change + team2Player2Change) / 2.0
 
 	// Create ELO history entries
-	eloHistories := []models.EloHistory{
+	eloHistories := []models.TeamEloHistory{
 		{
 			PlayerID:       match.Team1.Player1.ID,
-			MatchID:        match.ID,
+			TeamMatchID:    match.ID,
 			EloBefore:      match.Team1.Player1.TeamEloRating,
 			EloAfter:       match.Team1.Player1.TeamEloRating + team1Player1Change,
 			EloChange:      team1Player1Change,
 			OpponentTeamID: &match.Team2ID,
-			MatchType:      "team",
 			CreatedAt:      now,
 		},
 		{
 			PlayerID:       match.Team1.Player2.ID,
-			MatchID:        match.ID,
+			TeamMatchID:    match.ID,
 			EloBefore:      match.Team1.Player2.TeamEloRating,
 			EloAfter:       match.Team1.Player2.TeamEloRating + team1Player2Change,
 			EloChange:      team1Player2Change,
 			OpponentTeamID: &match.Team2ID,
-			MatchType:      "team",
 			CreatedAt:      now,
 		},
 		{
 			PlayerID:       match.Team2.Player1.ID,
-			MatchID:        match.ID,
+			TeamMatchID:    match.ID,
 			EloBefore:      match.Team2.Player1.TeamEloRating,
 			EloAfter:       match.Team2.Player1.TeamEloRating + team2Player1Change,
 			EloChange:      team2Player1Change,
 			OpponentTeamID: &match.Team1ID,
-			MatchType:      "team",
 			CreatedAt:      now,
 		},
 		{
 			PlayerID:       match.Team2.Player2.ID,
-			MatchID:        match.ID,
+			TeamMatchID:    match.ID,
 			EloBefore:      match.Team2.Player2.TeamEloRating,
 			EloAfter:       match.Team2.Player2.TeamEloRating + team2Player2Change,
 			EloChange:      team2Player2Change,
 			OpponentTeamID: &match.Team1ID,
-			MatchType:      "team",
 			CreatedAt:      now,
 		},
 	}

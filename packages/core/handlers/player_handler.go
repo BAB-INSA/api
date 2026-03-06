@@ -61,11 +61,10 @@ func (h *PlayerHandler) GetPlayer(c *gin.Context) {
 
 // GetEloHistory retrieves ELO history for a player
 // @Summary Get player ELO history
-// @Description Get ELO rating history for a specific player with optional match type filter
+// @Description Get ELO rating history for a specific player (solo matches)
 // @Tags players
 // @Produce json
 // @Param id path int true "Player ID"
-// @Param match_type query string false "Filter by match type" Enums(solo, team)
 // @Success 200 {array} models.EloHistory
 // @Failure 400 {object} map[string]string
 // @Failure 404 {object} map[string]string
@@ -81,16 +80,6 @@ func (h *PlayerHandler) GetEloHistory(c *gin.Context) {
 		return
 	}
 
-	// Get match_type filter
-	matchType := c.Query("match_type")
-	if matchType != "" && matchType != "solo" && matchType != "team" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid match_type. Must be 'solo' or 'team'",
-		})
-		return
-	}
-
-	// Check if player exists
 	_, err = h.playerService.GetPlayerByID(uint(id))
 	if err != nil {
 		if err.Error() == "player not found" {
@@ -105,11 +94,56 @@ func (h *PlayerHandler) GetEloHistory(c *gin.Context) {
 		return
 	}
 
-	// Get ELO history with filter
-	eloHistory, err := h.playerService.GetEloHistoryByPlayerID(uint(id), matchType)
+	eloHistory, err := h.playerService.GetEloHistoryByPlayerID(uint(id))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to retrieve ELO history",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, eloHistory)
+}
+
+// GetTeamEloHistory retrieves team ELO history for a player
+// @Summary Get player team ELO history
+// @Description Get team ELO rating history for a specific player
+// @Tags players
+// @Produce json
+// @Param id path int true "Player ID"
+// @Success 200 {array} models.TeamEloHistory
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /players/{id}/team-elo-history [get]
+func (h *PlayerHandler) GetTeamEloHistory(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid player ID",
+		})
+		return
+	}
+
+	_, err = h.playerService.GetPlayerByID(uint(id))
+	if err != nil {
+		if err.Error() == "player not found" {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "Player not found",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Internal server error",
+		})
+		return
+	}
+
+	eloHistory, err := h.playerService.GetTeamEloHistoryByPlayerID(uint(id))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to retrieve team ELO history",
 		})
 		return
 	}

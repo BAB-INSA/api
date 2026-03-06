@@ -350,5 +350,37 @@ func GetCoreMigrations() []MigrationDefinition {
 				return nil
 			},
 		},
+		{
+			Name: "2026_03_06_000000_create_team_elo_history",
+			Up: func(db *gorm.DB) error {
+				if err := db.Exec(`
+					CREATE TABLE IF NOT EXISTS team_elo_history (
+						id BIGSERIAL PRIMARY KEY,
+						player_id BIGINT NOT NULL,
+						team_match_id BIGINT NOT NULL,
+						elo_before FLOAT NOT NULL,
+						elo_after FLOAT NOT NULL,
+						elo_change FLOAT NOT NULL,
+						opponent_team_id BIGINT,
+						created_at TIMESTAMP DEFAULT NOW(),
+						updated_at TIMESTAMP DEFAULT NOW(),
+						deleted_at TIMESTAMP NULL,
+						FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
+						FOREIGN KEY (team_match_id) REFERENCES team_matches(id) ON DELETE CASCADE,
+						FOREIGN KEY (opponent_team_id) REFERENCES teams(id)
+					);
+					CREATE INDEX IF NOT EXISTS idx_team_elo_history_deleted_at ON team_elo_history(deleted_at);
+					CREATE INDEX IF NOT EXISTS idx_team_elo_history_player_id ON team_elo_history(player_id);
+					CREATE INDEX IF NOT EXISTS idx_team_elo_history_team_match_id ON team_elo_history(team_match_id);
+					CREATE INDEX IF NOT EXISTS idx_team_elo_history_opponent_team_id ON team_elo_history(opponent_team_id);
+				`).Error; err != nil {
+					return err
+				}
+				return nil
+			},
+			Down: func(db *gorm.DB) error {
+				return db.Exec("DROP TABLE IF EXISTS team_elo_history CASCADE").Error
+			},
+		},
 	}
 }

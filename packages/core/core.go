@@ -25,6 +25,7 @@ type Module struct {
 	TournamentHandler     *handlers.TournamentHandler
 	TournamentService     *services.TournamentService
 	EloHistoryHandler     *handlers.EloHistoryHandler
+	TeamEloHistoryHandler *handlers.TeamEloHistoryHandler
 	EloHistoryService     *services.EloHistoryService
 	StatsHandler          *handlers.StatsHandler
 	StatsService          *services.StatsService
@@ -51,6 +52,7 @@ func NewModule(db *gorm.DB) *Module {
 
 	eloHistoryService := services.NewEloHistoryService(db)
 	eloHistoryHandler := handlers.NewEloHistoryHandler(eloHistoryService)
+	teamEloHistoryHandler := handlers.NewTeamEloHistoryHandler(eloHistoryService)
 
 	statsService := services.NewStatsService(db)
 	statsHandler := handlers.NewStatsHandler(statsService)
@@ -71,6 +73,7 @@ func NewModule(db *gorm.DB) *Module {
 		TournamentHandler:     tournamentHandler,
 		TournamentService:     tournamentService,
 		EloHistoryHandler:     eloHistoryHandler,
+		TeamEloHistoryHandler: teamEloHistoryHandler,
 		EloHistoryService:     eloHistoryService,
 		StatsHandler:          statsHandler,
 		StatsService:          statsService,
@@ -88,6 +91,7 @@ func (m *Module) SetupRoutes(r *gin.Engine) {
 		players.GET("/top-teams", authMiddleware.OptionalJWTMiddleware(), m.PlayerHandler.GetTopPlayersByTeamElo)
 		players.GET("/:id", m.PlayerHandler.GetPlayer)
 		players.GET("/:id/elo-history", m.PlayerHandler.GetEloHistory)
+		players.GET("/:id/team-elo-history", m.PlayerHandler.GetTeamEloHistory)
 		players.GET("/:id/matches", m.PlayerHandler.GetPlayerMatches)
 		players.GET("/:id/teams", m.PlayerHandler.GetPlayerTeams)
 	}
@@ -139,6 +143,11 @@ func (m *Module) SetupRoutes(r *gin.Engine) {
 	eloHistory := r.Group("/elo-history")
 	{
 		eloHistory.GET("/recent", m.EloHistoryHandler.GetRecentEloChanges)
+	}
+
+	teamEloHistory := r.Group("/team-elo-history")
+	{
+		teamEloHistory.GET("/recent", m.TeamEloHistoryHandler.GetRecentTeamEloChanges)
 	}
 
 	r.GET("/stats", m.StatsHandler.GetStats)

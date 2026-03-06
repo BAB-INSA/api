@@ -57,8 +57,7 @@ migration-status: ## Afficher le statut des migrations
 
 swagger: ## Générer la documentation Swagger
 	@echo "Génération de la documentation Swagger..."
-	@which swag >/dev/null 2>&1 || (echo "swag not found in PATH, trying common locations..."; /home/magicbart/gocode/bin/swag init && exit 0)
-	swag init
+	@which swag >/dev/null 2>&1 && swag init || (echo "swag not found in PATH, trying common locations..."; /home/magicbart/gocode/bin/swag init)
 
 test: ## Lancer les tests
 	@echo "Exécution des tests..."
