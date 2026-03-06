@@ -60,7 +60,7 @@ func (h *TournamentHandler) CreateTournament(c *gin.Context) {
 // @Tags tournaments
 // @Produce json
 // @Param id path int true "Tournament ID"
-// @Success 200 {object} models.TournamentResponse
+// @Success 200 {object} models.Tournament
 // @Failure 400 {object} map[string]string
 // @Failure 404 {object} map[string]string
 // @Router /tournaments/{id} [get]

@@ -1276,7 +1276,7 @@ const docTemplate = `{
         },
         "/players/{id}/elo-history": {
             "get": {
-                "description": "Get ELO rating history for a specific player with optional match type filter",
+                "description": "Get ELO rating history for a specific player (solo matches)",
                 "produces": [
                     "application/json"
                 ],
@@ -1291,16 +1291,6 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "enum": [
-                            "solo",
-                            "team"
-                        ],
-                        "type": "string",
-                        "description": "Filter by match type",
-                        "name": "match_type",
-                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1391,6 +1381,65 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/models.PaginatedMatchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/players/{id}/team-elo-history": {
+            "get": {
+                "description": "Get team ELO rating history for a specific player",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "players"
+                ],
+                "summary": "Get player team ELO history",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Player ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.TeamEloHistory"
+                            }
                         }
                     },
                     "400": {
@@ -1545,6 +1594,55 @@ const docTemplate = `{
                 }
             }
         },
+        "/team-elo-history/recent": {
+            "get": {
+                "description": "Get recent team ELO changes for all players ordered by date (newest first)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "team-elo-history"
+                ],
+                "summary": "Get recent team ELO changes",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Number of ELO changes to retrieve (default: 10, max: 100)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.TeamEloHistory"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/team-matches": {
             "get": {
                 "description": "Get team matches with optional filters for team, player, status, and date range",
@@ -1578,6 +1676,12 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "Filter by player ID",
                         "name": "player_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by tournament ID",
+                        "name": "tournament_id",
                         "in": "query"
                     },
                     {
@@ -2396,12 +2500,23 @@ const docTemplate = `{
                     },
                     {
                         "enum": [
+                            "opened",
                             "ongoing",
                             "finished"
                         ],
                         "type": "string",
                         "description": "Filter by status",
                         "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "solo",
+                            "team"
+                        ],
+                        "type": "string",
+                        "description": "Filter by type",
+                        "name": "type",
                         "in": "query"
                     }
                 ],
@@ -2511,7 +2626,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.TournamentResponse"
+                            "$ref": "#/definitions/models.Tournament"
                         }
                     },
                     "400": {
@@ -2808,135 +2923,6 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/tournaments/{id}/stats": {
-            "get": {
-                "description": "Get calculated statistics for a tournament",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "tournaments"
-                ],
-                "summary": "Get tournament stats",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Tournament ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.TournamentStats"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/tournaments/{id}/status": {
-            "patch": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Change tournament status (admin only)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "tournaments"
-                ],
-                "summary": "Update tournament status",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Tournament ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Status update",
-                        "name": "status",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.UpdateTournamentStatusRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.Tournament"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -3555,20 +3541,10 @@ const docTemplate = `{
                 "match_id": {
                     "type": "integer"
                 },
-                "match_type": {
-                    "description": "solo or team",
-                    "type": "string"
-                },
                 "opponent": {
                     "$ref": "#/definitions/models.Player"
                 },
                 "opponent_id": {
-                    "type": "integer"
-                },
-                "opponent_team": {
-                    "$ref": "#/definitions/models.Team"
-                },
-                "opponent_team_id": {
                     "type": "integer"
                 },
                 "player": {
@@ -3761,7 +3737,7 @@ const docTemplate = `{
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/models.TournamentTeam"
+                        "$ref": "#/definitions/models.TournamentTeamItem"
                     }
                 },
                 "page": {
@@ -3784,7 +3760,7 @@ const docTemplate = `{
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/models.Tournament"
+                        "$ref": "#/definitions/models.TournamentListItem"
                     }
                 },
                 "page": {
@@ -4065,6 +4041,52 @@ const docTemplate = `{
                 }
             }
         },
+        "models.TeamEloHistory": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "elo_after": {
+                    "type": "number"
+                },
+                "elo_before": {
+                    "type": "number"
+                },
+                "elo_change": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "opponent_team": {
+                    "$ref": "#/definitions/models.Team"
+                },
+                "opponent_team_id": {
+                    "type": "integer"
+                },
+                "player": {
+                    "description": "Relationships",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.Player"
+                        }
+                    ]
+                },
+                "player_id": {
+                    "type": "integer"
+                },
+                "team_match": {
+                    "$ref": "#/definitions/models.TeamMatch"
+                },
+                "team_match_id": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "models.TeamMatch": {
             "type": "object",
             "properties": {
@@ -4154,11 +4176,17 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "nb_matches": {
+                    "type": "integer"
+                },
+                "nb_participants": {
+                    "type": "integer"
+                },
                 "slug": {
                     "type": "string"
                 },
                 "status": {
-                    "description": "ongoing, finished",
+                    "description": "opened, ongoing, finished",
                     "type": "string"
                 },
                 "team_matches": {
@@ -4183,7 +4211,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.TournamentResponse": {
+        "models.TournamentListItem": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -4195,55 +4223,26 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
-                "matches": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/models.Match"
-                    }
-                },
                 "name": {
                     "type": "string"
+                },
+                "nb_matches": {
+                    "type": "integer"
+                },
+                "nb_participants": {
+                    "type": "integer"
                 },
                 "slug": {
                     "type": "string"
                 },
-                "stats": {
-                    "$ref": "#/definitions/models.TournamentStats"
-                },
                 "status": {
-                    "description": "ongoing, finished",
                     "type": "string"
                 },
-                "team_matches": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/models.TeamMatch"
-                    }
-                },
-                "tournament_teams": {
-                    "description": "Relationships",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/models.TournamentTeam"
-                    }
-                },
                 "type": {
-                    "description": "solo, team",
                     "type": "string"
                 },
                 "updated_at": {
                     "type": "string"
-                }
-            }
-        },
-        "models.TournamentStats": {
-            "type": "object",
-            "properties": {
-                "total_matches": {
-                    "type": "integer"
-                },
-                "total_teams": {
-                    "type": "integer"
                 }
             }
         },
@@ -4254,6 +4253,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
+                    "type": "integer"
+                },
+                "losses": {
                     "type": "integer"
                 },
                 "team": {
@@ -4275,6 +4277,29 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
+                },
+                "wins": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.TournamentTeamItem": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "losses": {
+                    "type": "integer"
+                },
+                "team": {
+                    "$ref": "#/definitions/models.Team"
+                },
+                "team_id": {
+                    "type": "integer"
+                },
+                "wins": {
+                    "type": "integer"
                 }
             }
         },
@@ -4326,18 +4351,11 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
-                }
-            }
-        },
-        "models.UpdateTournamentStatusRequest": {
-            "type": "object",
-            "required": [
-                "status"
-            ],
-            "properties": {
+                },
                 "status": {
                     "type": "string",
                     "enum": [
+                        "opened",
                         "ongoing",
                         "finished"
                     ]

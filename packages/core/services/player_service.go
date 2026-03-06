@@ -66,19 +66,28 @@ func (s *PlayerService) CreatePlayerWithTx(tx *gorm.DB, userID uint, username st
 	return player, nil
 }
 
-func (s *PlayerService) GetEloHistoryByPlayerID(playerID uint, matchType string) ([]models.EloHistory, error) {
+func (s *PlayerService) GetEloHistoryByPlayerID(playerID uint) ([]models.EloHistory, error) {
 	var eloHistory []models.EloHistory
 
-	query := s.db.Where("player_id = ?", playerID)
-
-	// Filter by match type if specified
-	if matchType != "" {
-		query = query.Where("match_type = ?", matchType)
-	}
-
-	result := query.Order("id ASC").
+	result := s.db.Where("player_id = ?", playerID).
+		Order("id ASC").
 		Preload("Match").
 		Preload("Opponent").
+		Find(&eloHistory)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return eloHistory, nil
+}
+
+func (s *PlayerService) GetTeamEloHistoryByPlayerID(playerID uint) ([]models.TeamEloHistory, error) {
+	var eloHistory []models.TeamEloHistory
+
+	result := s.db.Where("player_id = ?", playerID).
+		Order("id ASC").
+		Preload("TeamMatch").
 		Preload("OpponentTeam").
 		Find(&eloHistory)
 
